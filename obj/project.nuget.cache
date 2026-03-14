@@ -1,8 +1,8 @@
 {
   "version": 2,
-  "dgSpecHash": "Pwh2eBTnQEo=",
+  "dgSpecHash": "2gnyMVrPU98=",
   "success": true,
-  "projectFilePath": "C:\\Users\\vaibh\\OneDrive\\Desktop\\dextop\\codes\\Bulk Generator\\BulkImageGenerator\\BulkImageGenerator.csproj",
+  "projectFilePath": "C:\\Users\\vaibh\\OneDrive\\Desktop\\dextop\\codes\\Bulk Generator\\CardForge\\BulkImageGenerator.csproj",
   "expectedPackageFiles": [
     "C:\\Users\\vaibh\\.nuget\\packages\\communitytoolkit.mvvm\\8.4.0\\communitytoolkit.mvvm.8.4.0.nupkg.sha512",
     "C:\\Users\\vaibh\\.nuget\\packages\\exceldatareader\\3.7.0\\exceldatareader.3.7.0.nupkg.sha512",

@@ -12,6 +12,7 @@
           "ExcelDataReader": "3.7.0",
           "ExcelDataReader.DataSet": "3.7.0",
           "SkiaSharp": "2.88.8",
+          "SkiaSharp.NativeAssets.Win32": "2.88.8",
           "SkiaSharp.Views.WPF": "2.88.8"
         },
         "runtime": {

@@ -1,9 +1,11 @@
 using BulkImageGenerator.Models;
 using SkiaSharp;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -13,25 +15,22 @@ namespace BulkImageGenerator.Services
     /// Core bulk image generation engine.
     ///
     /// THREADING MODEL:
-    ///   - The background SKBitmap is decoded ONCE into a byte array (EncodedData),
-    ///     then each parallel thread independently decodes a private SKBitmap from
-    ///     that shared byte array. This is the safest cross-thread pattern for
-    ///     SkiaSharp — SKBitmap is NOT thread-safe for shared reads via GetPixels.
+    ///   - Background image bytes loaded ONCE into shared byte[].
+    ///   - Asset images cached in ConcurrentDictionary — each unique file
+    ///     read from disk exactly once, all threads reuse cached bytes.
+    ///   - Each thread decodes its own private SKBitmap — SKBitmap is NOT thread-safe.
     ///
     /// MEMORY MANAGEMENT:
-    ///   - Every SKBitmap, SKSurface, SKCanvas, SKPaint, and SKTypeface is wrapped
-    ///     in a `using` statement so unmanaged memory is freed immediately after use.
-    ///   - For 10,000+ row jobs, this prevents the Large Object Heap (LOH) from
-    ///     accumulating hundreds of MB of orphaned unmanaged bitmaps.
+    ///   - Every SKBitmap, SKSurface, SKPaint, SKTypeface in a `using` block.
+    ///   - RAM stays flat even at 10,000+ images.
     /// </summary>
     public sealed class ImageGeneratorService
     {
-        // ── Shared state (read-only after PrepareAsync) ─────────────────────────
+        // ── Shared state (read-only after PrepareAsync) ────────────────────────
 
         /// <summary>
-        /// The raw encoded bytes of the background image.
-        /// Shared across all threads; threads decode their own private SKBitmap from this.
-        /// Encoding format is preserved (PNG/JPEG) — no intermediate decompression.
+        /// Raw encoded bytes of the background image.
+        /// Shared across all threads. Each thread decodes its own SKBitmap from this.
         /// </summary>
         private byte[]? _backgroundImageBytes;
 
@@ -39,71 +38,73 @@ namespace BulkImageGenerator.Services
         private Template? _template;
 
         /// <summary>
-        /// Maximum degree of parallelism.
-        /// Defaults to (LogicalCPUCount - 1) to keep the UI thread responsive.
-        /// Tune down for machines with limited RAM (each thread holds ~1 decoded bitmap).
+        /// Thread-safe cache of image asset bytes keyed by resolved file path.
+        /// Each unique image file is read from disk exactly once.
+        /// All parallel threads reuse the cached bytes — eliminates file lock conflicts.
+        /// </summary>
+        private readonly ConcurrentDictionary<string, byte[]> _imageCache
+            = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
+        /// Max parallel threads. Defaults to (CPU count - 1) to keep UI responsive.
+        /// Each active thread holds one decoded SKBitmap in memory (~width*height*4 bytes).
         /// </summary>
         private readonly int _maxDegreeOfParallelism;
 
-        // ────────────────────────────────────────────────────────────────────────
+        // ── Constructor ────────────────────────────────────────────────────────
 
         public ImageGeneratorService(int? maxDegreeOfParallelism = null)
         {
-            // Leave one logical core for the UI/OS; minimum of 1 for single-core machines.
             _maxDegreeOfParallelism = maxDegreeOfParallelism
                 ?? Math.Max(1, Environment.ProcessorCount - 1);
         }
 
-        // ── 1. Preparation ───────────────────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════════════════
+        // PUBLIC API
+        // ══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Loads and validates the template and pre-reads the background image bytes
-        /// into managed memory. Must be called once before GenerateAllAsync.
+        /// Step 1: Call ONCE before GenerateAllAsync.
+        /// Loads background image into memory, validates it, clears the image cache.
         /// </summary>
-        /// <param name="template">The template configuration object.</param>
-        /// <exception cref="FileNotFoundException">If the background image path is invalid.</exception>
-        /// <exception cref="InvalidOperationException">If the image cannot be decoded.</exception>
         public Task PrepareAsync(Template template)
         {
             _template = template ?? throw new ArgumentNullException(nameof(template));
+
+            // Clear cached assets from any previous generation run.
+            _imageCache.Clear();
 
             if (!File.Exists(template.BackgroundImagePath))
                 throw new FileNotFoundException(
                     $"Background image not found: {template.BackgroundImagePath}",
                     template.BackgroundImagePath);
 
-            // Read all bytes into managed memory synchronously (fast for local files).
-            // We do a decode probe here to catch corrupt images early, before the batch starts.
+            // Read all background bytes into managed memory once.
             _backgroundImageBytes = File.ReadAllBytes(template.BackgroundImagePath);
-            using var probeImage = SKBitmap.Decode(_backgroundImageBytes);
-            if (probeImage is null)
+
+            // Probe-decode to catch corrupt files before the batch starts.
+            using var probe = SKBitmap.Decode(_backgroundImageBytes);
+            if (probe is null)
                 throw new InvalidOperationException(
-                    $"SkiaSharp could not decode the background image at: {template.BackgroundImagePath}");
+                    $"SkiaSharp could not decode background image: {template.BackgroundImagePath}\n" +
+                    "Ensure it is a valid JPG or PNG file.");
 
             return Task.CompletedTask;
         }
 
-        // ── 2. Main Batch Entry Point ────────────────────────────────────────────
-
         /// <summary>
-        /// Generates one output image per row in <paramref name="rows"/> using Parallel.ForEach.
+        /// Step 2: Runs the parallel bulk generation batch.
         ///
-        /// Each row dictionary maps Excel column headers to cell values.
-        /// Image-type placeholders expect the cell value to be an absolute file path
-        /// to the source image asset on disk.
+        /// Each row dictionary maps Excel column headers to cell values:
+        ///   { "name": "Alice", "photo": "alice.jpg" }
+        ///
+        /// Image columns should contain either:
+        ///   - A bare filename ("alice.jpg") — resolved via AssetsFolder in MainViewModel
+        ///   - A full absolute path ("C:\assets\alice.jpg")
+        ///
+        /// Progress callbacks are marshaled to the UI thread automatically via
+        /// IProgress — no Dispatcher.Invoke needed anywhere.
         /// </summary>
-        /// <param name="rows">Parsed Excel data. Each dict is one row: {"name":"Alice","photo":"C:/assets/alice.jpg"}.</param>
-        /// <param name="outputDirectory">Directory where output images will be saved.</param>
-        /// <param name="fileNameColumn">
-        ///   The column name to use as the output filename (without extension).
-        ///   If null or missing in a row, falls back to a zero-padded row index.
-        /// </param>
-        /// <param name="progress">
-        ///   IProgress callback fired after each image completes.
-        ///   Reports (completedCount, totalCount). Safe to bind to a WPF ProgressBar
-        ///   because IProgress<T> automatically marshals to the captured SynchronizationContext.
-        /// </param>
-        /// <param name="cancellationToken">Token to abort the batch mid-run.</param>
         public async Task GenerateAllAsync(
             IEnumerable<Dictionary<string, string>> rows,
             string outputDirectory,
@@ -111,162 +112,168 @@ namespace BulkImageGenerator.Services
             IProgress<(int Completed, int Total)>? progress = null,
             CancellationToken cancellationToken = default)
         {
-            // ── Guard checks ────────────────────────────────────────────────────
             if (_template is null || _backgroundImageBytes is null)
                 throw new InvalidOperationException(
-                    "PrepareAsync must be called before GenerateAllAsync.");
+                    "Call PrepareAsync() before GenerateAllAsync().");
 
             Directory.CreateDirectory(outputDirectory);
 
-            // Materialize to list so we have a count for progress reporting.
-            var rowList = rows as List<Dictionary<string, string>> ?? rows.ToList();
-            int total = rowList.Count;
+            var rowList   = rows as List<Dictionary<string, string>> ?? rows.ToList();
+            int total     = rowList.Count;
             int completed = 0;
 
-            // ── Parallel batch loop ─────────────────────────────────────────────
-            // ParallelOptions wires up cancellation and CPU throttling together.
             var parallelOptions = new ParallelOptions
             {
                 MaxDegreeOfParallelism = _maxDegreeOfParallelism,
-                CancellationToken = cancellationToken
+                CancellationToken      = cancellationToken
             };
 
-            // Wrap in Task.Run so the calling (UI) thread is not blocked.
+            // Task.Run prevents blocking the UI thread for the entire batch duration.
             await Task.Run(() =>
             {
                 Parallel.ForEach(rowList, parallelOptions, (row, _, rowIndex) =>
                 {
-                    // Check for cancellation at the start of each iteration.
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    // Determine output filename.
-                    string fileName = DeriveFileName(row, fileNameColumn, (int)rowIndex);
-                    string extension = _template.OutputFormat.Equals("png", StringComparison.OrdinalIgnoreCase)
-                        ? ".png" : ".jpg";
+                    string fileName  = DeriveFileName(row, fileNameColumn, (int)rowIndex);
+                    string extension = _template.OutputFormat
+                        .Equals("png", StringComparison.OrdinalIgnoreCase) ? ".png" : ".jpg";
                     string outputPath = Path.Combine(outputDirectory, fileName + extension);
 
-                    // Generate and save the single image for this row.
                     GenerateSingleImage(row, outputPath);
 
-                    // Atomically increment the shared counter and report progress.
-                    // Interlocked.Increment is lock-free and safe across threads.
-                    int currentCompleted = Interlocked.Increment(ref completed);
-                    progress?.Report((currentCompleted, total));
+                    // Interlocked.Increment is lock-free — safe across all threads.
+                    int current = Interlocked.Increment(ref completed);
+                    progress?.Report((current, total));
                 });
+
             }, cancellationToken);
         }
 
-        // ── 3. Single-Image Renderer ─────────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════════════════
+        // PRIVATE: SINGLE IMAGE RENDERER
+        // ══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Renders one image to disk. Called on a thread-pool thread.
-        ///
-        /// Resource lifecycle (all disposed by end of method):
-        ///   backgroundBitmap → SKSurface → SKCanvas → per-placeholder SKPaint/SKBitmap
+        /// Renders one complete image for a single Excel row and saves it to disk.
+        /// Called concurrently on thread-pool threads.
+        /// All SkiaSharp resources are fully disposed before this method returns.
         /// </summary>
-        private void GenerateSingleImage(Dictionary<string, string> row, string outputPath)
+        private void GenerateSingleImage(
+            Dictionary<string, string> row,
+            string outputPath)
         {
-            // Each thread decodes its own private copy of the background bitmap.
-            // This is the key thread-safety pattern: _backgroundImageBytes is a
-            // shared readonly byte[], and SKBitmap.Decode() is a pure read operation.
+            // Each thread gets its own decoded background bitmap.
+            // Decoding from a shared byte[] is a pure read operation — thread safe.
             using var backgroundBitmap = SKBitmap.Decode(_backgroundImageBytes);
 
-            // Create an off-screen surface at the template's target resolution.
-            // SKSurface is backed by GPU-less (CPU raster) memory — safe off-screen.
+            // CPU raster surface — no GPU required, fully thread safe.
             using var surface = SKSurface.Create(new SKImageInfo(
                 _template!.CanvasWidth,
                 _template.CanvasHeight,
-                SKColorType.Bgra8888,         // Standard 32-bit color
-                SKAlphaType.Premul));          // Premultiplied alpha for compositing
+                SKColorType.Bgra8888,
+                SKAlphaType.Premul));
 
             if (surface is null)
                 throw new InvalidOperationException(
-                    "SkiaSharp could not create an off-screen surface. " +
-                    "Check that CanvasWidth/CanvasHeight are > 0.");
+                    "SkiaSharp could not create a rendering surface. " +
+                    "Check that CanvasWidth and CanvasHeight are greater than zero.");
 
             SKCanvas canvas = surface.Canvas;
-            canvas.Clear(SKColors.White); // Default background if image load fails.
+            canvas.Clear(SKColors.White);
 
-            // ── Draw background image ───────────────────────────────────────────
-            var destRect = new SKRect(0, 0, _template.CanvasWidth, _template.CanvasHeight);
-            using (var bgPaint = new SKPaint { IsAntialias = true, FilterQuality = SKFilterQuality.High })
+            // ── Draw background ────────────────────────────────────────────────
+            using (var bgPaint = new SKPaint
             {
-                canvas.DrawBitmap(backgroundBitmap, destRect, bgPaint);
+                IsAntialias   = true,
+                FilterQuality = SKFilterQuality.High
+            })
+            {
+                canvas.DrawBitmap(
+                    backgroundBitmap,
+                    new SKRect(0, 0, _template.CanvasWidth, _template.CanvasHeight),
+                    bgPaint);
             }
 
-            // ── Draw each placeholder ───────────────────────────────────────────
+            // ── Draw each placeholder ──────────────────────────────────────────
             foreach (var placeholder in _template.Placeholders)
             {
-                // Look up the value for this placeholder from the row data.
-                // Uses the variableName directly (no curly braces in the key).
+                // Skip placeholders with no matching data in this row.
                 if (!row.TryGetValue(placeholder.VariableName, out string? value)
                     || string.IsNullOrWhiteSpace(value))
-                    continue; // Skip placeholders with no data for this row.
+                    continue;
 
                 if (placeholder.Type.Equals("text", StringComparison.OrdinalIgnoreCase))
                     DrawTextPlaceholder(canvas, placeholder, value);
+
                 else if (placeholder.Type.Equals("image", StringComparison.OrdinalIgnoreCase))
                     DrawImagePlaceholder(canvas, placeholder, value);
             }
 
-            // ── Encode and save to disk ─────────────────────────────────────────
-            // Snapshot() creates an immutable SKImage from the surface pixels.
+            // ── Encode and save to disk ────────────────────────────────────────
             using var image = surface.Snapshot();
-            using var encodedData = _template.OutputFormat.Equals("png", StringComparison.OrdinalIgnoreCase)
-                ? image.Encode(SKEncodedImageFormat.Png, 100)
-                : image.Encode(SKEncodedImageFormat.Jpeg, _template.OutputQuality);
+            using var encodedData = _template.OutputFormat
+                .Equals("png", StringComparison.OrdinalIgnoreCase)
+                    ? image.Encode(SKEncodedImageFormat.Png, 100)
+                    : image.Encode(SKEncodedImageFormat.Jpeg, _template.OutputQuality);
 
-            using var fileStream = File.OpenWrite(outputPath);
+            // FileShare.None is fine here — each output file has a unique name.
+            using var fileStream = new FileStream(
+                outputPath,
+                FileMode.Create,
+                FileAccess.Write,
+                FileShare.None);
+
             encodedData.SaveTo(fileStream);
         }
 
-        // ── 4. Text Rendering ────────────────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════════════════
+        // PRIVATE: TEXT RENDERING
+        // ══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Draws a text value inside a placeholder's bounding box.
-        /// Handles: font loading, word-wrap, multi-line layout, and
-        /// horizontal/vertical alignment within the box.
+        /// Draws a text value inside a placeholder bounding box.
+        /// Handles font loading, word wrap, multi-line layout,
+        /// and horizontal + vertical alignment.
         /// </summary>
         private static void DrawTextPlaceholder(
             SKCanvas canvas,
             Placeholder placeholder,
             string text)
         {
-            var style = placeholder.TextStyle ?? new TextStyle();
+            var style  = placeholder.TextStyle ?? new TextStyle();
             var bounds = placeholder.Bounds;
 
-            // Convert #AARRGGBB hex string to SKColor.
             SKColor textColor = ParseHexColor(style.Color);
 
-            // Build the font style flags (bold/italic combination).
             var fontStyle = (style.Bold, style.Italic) switch
             {
-                (true, true)   => SKFontStyle.BoldItalic,
-                (true, false)  => SKFontStyle.Bold,
+                (true,  true)  => SKFontStyle.BoldItalic,
+                (true,  false) => SKFontStyle.Bold,
                 (false, true)  => SKFontStyle.Italic,
                 _              => SKFontStyle.Normal
             };
 
-            // SKTypeface.FromFamilyName falls back gracefully to the system default
-            // if the requested font family is not installed.
+            // Falls back to system default font if family not installed.
             using var typeface = SKTypeface.FromFamilyName(style.FontFamily, fontStyle)
                                  ?? SKTypeface.Default;
 
             using var paint = new SKPaint
             {
-                Typeface  = typeface,
-                TextSize  = style.FontSize,
-                Color     = textColor,
-                IsAntialias = true,
-                // SubpixelText improves readability at medium sizes.
+                Typeface     = typeface,
+                TextSize     = style.FontSize,
+                Color        = textColor,
+                IsAntialias  = true,
                 SubpixelText = true,
             };
 
-            // Clip canvas to the bounding box so text cannot overflow onto other elements.
+            // Clip canvas to bounding box — text cannot overflow onto other elements.
             canvas.Save();
-            canvas.ClipRect(new SKRect(bounds.X, bounds.Y,
-                                       bounds.X + bounds.Width,
-                                       bounds.Y + bounds.Height));
+            canvas.ClipRect(new SKRect(
+                bounds.X,
+                bounds.Y,
+                bounds.X + bounds.Width,
+                bounds.Y + bounds.Height));
 
             if (style.WordWrap)
                 DrawWrappedText(canvas, paint, style, bounds, text);
@@ -277,8 +284,8 @@ namespace BulkImageGenerator.Services
         }
 
         /// <summary>
-        /// Breaks text into lines that fit within bounds.Width, then
-        /// positions the text block according to horizontal and vertical alignment.
+        /// Breaks text into word-wrapped lines and draws the full block
+        /// with horizontal and vertical alignment applied.
         /// </summary>
         private static void DrawWrappedText(
             SKCanvas canvas,
@@ -287,21 +294,18 @@ namespace BulkImageGenerator.Services
             Bounds bounds,
             string text)
         {
-            float lineHeight = style.FontSize * style.LineHeight;
-            var lines = WrapText(text, bounds.Width, paint);
-
-            // Calculate total block height for vertical alignment.
+            float lineHeight       = style.FontSize * style.LineHeight;
+            var   lines            = WrapText(text, bounds.Width, paint);
             float totalBlockHeight = lines.Count * lineHeight;
 
             float blockStartY = style.VerticalAlignment switch
             {
                 "middle" => bounds.Y + (bounds.Height - totalBlockHeight) / 2f,
-                "bottom" => bounds.Y + bounds.Height - totalBlockHeight,
-                _        => bounds.Y  // "top" default
+                "bottom" => bounds.Y +  bounds.Height - totalBlockHeight,
+                _        => bounds.Y   // "top"
             };
 
-            // SkiaSharp's DrawText Y coordinate is the baseline, not the top of the line.
-            // We offset by FontMetrics.Ascent (negative value) to get the cap height start.
+            // SkiaSharp DrawText Y = baseline. Offset by -Ascent to get cap-height start.
             paint.GetFontMetrics(out SKFontMetrics metrics);
             float baselineOffset = -metrics.Ascent;
 
@@ -312,8 +316,8 @@ namespace BulkImageGenerator.Services
                 float x = style.Alignment switch
                 {
                     "center" => bounds.X + (bounds.Width - lineWidth) / 2f,
-                    "right"  => bounds.X + bounds.Width - lineWidth,
-                    _        => bounds.X // "left"
+                    "right"  => bounds.X +  bounds.Width - lineWidth,
+                    _        => bounds.X   // "left"
                 };
 
                 canvas.DrawText(line, x, blockStartY + baselineOffset, paint);
@@ -322,8 +326,7 @@ namespace BulkImageGenerator.Services
         }
 
         /// <summary>
-        /// Draws text as a single line, clipped by the bounding box width.
-        /// Used when WordWrap is disabled.
+        /// Draws text as a single non-wrapping line aligned within the bounding box.
         /// </summary>
         private static void DrawSingleLineText(
             SKCanvas canvas,
@@ -333,20 +336,20 @@ namespace BulkImageGenerator.Services
             string text)
         {
             paint.GetFontMetrics(out SKFontMetrics metrics);
-
             float lineHeight = style.FontSize * style.LineHeight;
+
             float y = style.VerticalAlignment switch
             {
                 "middle" => bounds.Y + (bounds.Height + lineHeight) / 2f - (-metrics.Ascent),
-                "bottom" => bounds.Y + bounds.Height - (-metrics.Descent),
-                _        => bounds.Y + (-metrics.Ascent)  // "top"
+                "bottom" => bounds.Y +  bounds.Height - (-metrics.Descent),
+                _        => bounds.Y + (-metrics.Ascent)   // "top"
             };
 
             float lineWidth = paint.MeasureText(text);
             float x = style.Alignment switch
             {
                 "center" => bounds.X + (bounds.Width - lineWidth) / 2f,
-                "right"  => bounds.X + bounds.Width - lineWidth,
+                "right"  => bounds.X +  bounds.Width - lineWidth,
                 _        => bounds.X
             };
 
@@ -354,14 +357,17 @@ namespace BulkImageGenerator.Services
         }
 
         /// <summary>
-        /// Greedy line-breaking algorithm: builds lines word-by-word,
-        /// only breaking when the next word would exceed the available width.
+        /// Greedy word-wrap: adds words one by one, breaking to a new line
+        /// only when the next word would exceed the available width.
         /// </summary>
-        private static List<string> WrapText(string text, float maxWidth, SKPaint paint)
+        private static List<string> WrapText(
+            string text,
+            float maxWidth,
+            SKPaint paint)
         {
-            var lines  = new List<string>();
-            var words  = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
-            var current = new System.Text.StringBuilder();
+            var lines   = new List<string>();
+            var words   = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+            var current = new StringBuilder();
 
             foreach (var word in words)
             {
@@ -389,43 +395,80 @@ namespace BulkImageGenerator.Services
             return lines;
         }
 
-        // ── 5. Image Rendering ───────────────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════════════════
+        // PRIVATE: IMAGE RENDERING
+        // ══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Loads the source image from disk, scales/crops it according to the
-        /// placeholder's ImageStyle, and draws it onto the canvas with optional
-        /// rounded-rectangle clipping.
+        /// Loads an image asset and draws it into the placeholder bounds.
         ///
-        /// Fit Modes:
-        ///   cover   — fills the box, may crop edges (like CSS background-size: cover)
-        ///   contain — fits fully inside the box, may leave gaps
-        ///   stretch — distorts to exactly fill the box (no aspect ratio preservation)
+        /// KEY FIX: Uses ConcurrentDictionary cache so each unique image file
+        /// is read from disk exactly once regardless of how many parallel threads
+        /// need it. Eliminates "file in use" errors during Parallel.ForEach.
+        ///
+        /// FileStream opened with FileShare.Read so multiple threads can
+        /// safely read the same file simultaneously if cache is cold.
         /// </summary>
-        private static void DrawImagePlaceholder(
+        private void DrawImagePlaceholder(
             SKCanvas canvas,
             Placeholder placeholder,
             string imagePath)
         {
-            // The cell value is expected to be an absolute path to the image asset.
-            if (!File.Exists(imagePath))
-                return; // Silently skip missing assets; caller can log errors separately.
+            string? resolvedPath = ResolveImagePath(imagePath);
 
-            var style  = placeholder.ImageStyle ?? new ImageStyle();
-            var bounds = placeholder.Bounds;
-            var destRect = new SKRect(bounds.X, bounds.Y,
-                                      bounds.X + bounds.Width,
-                                      bounds.Y + bounds.Height);
+            if (resolvedPath is null)
+            {
+                DrawErrorBox(canvas, placeholder.Bounds,
+                    $"Not found: {Path.GetFileName(imagePath)}");
+                return;
+            }
 
-            // Decode the asset image. Each thread has its own SKBitmap — no sharing.
-            using var assetBitmap = SKBitmap.Decode(imagePath);
-            if (assetBitmap is null) return;
+            // GetOrAdd is atomic — if two threads request the same file at the
+            // same time, only one performs the disk read. Others wait and reuse.
+            byte[] imageBytes;
+            try
+            {
+                imageBytes = _imageCache.GetOrAdd(resolvedPath, path =>
+                {
+                    // FileShare.Read allows concurrent reads of the same file.
+                    using var fs = new FileStream(
+                        path,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read);
+                    using var ms = new MemoryStream();
+                    fs.CopyTo(ms);
+                    return ms.ToArray();
+                });
+            }
+            catch (Exception ex)
+            {
+                DrawErrorBox(canvas, placeholder.Bounds, $"Read error: {ex.Message}");
+                return;
+            }
 
-            // Calculate the source rectangle (crop window) based on fit mode.
+            // Each thread decodes its own SKBitmap from the shared cached bytes.
+            // SKBitmap.Decode on a byte[] is a pure read — fully thread safe.
+            using var assetBitmap = SKBitmap.Decode(imageBytes);
+            if (assetBitmap is null)
+            {
+                DrawErrorBox(canvas, placeholder.Bounds,
+                    $"Decode failed: {Path.GetFileName(resolvedPath)}");
+                return;
+            }
+
+            var style    = placeholder.ImageStyle ?? new ImageStyle();
+            var bounds   = placeholder.Bounds;
+            var destRect = new SKRect(
+                bounds.X,
+                bounds.Y,
+                bounds.X + bounds.Width,
+                bounds.Y + bounds.Height);
+
             SKRect srcRect = CalculateSourceRect(assetBitmap, bounds, style);
 
             canvas.Save();
 
-            // Apply rounded-rectangle clip if a corner radius is specified.
             if (style.CornerRadius > 0)
             {
                 using var clipPath = new SKPath();
@@ -435,8 +478,8 @@ namespace BulkImageGenerator.Services
 
             using var imgPaint = new SKPaint
             {
-                IsAntialias    = true,
-                FilterQuality  = SKFilterQuality.High
+                IsAntialias   = true,
+                FilterQuality = SKFilterQuality.High
             };
 
             canvas.DrawBitmap(assetBitmap, srcRect, destRect, imgPaint);
@@ -444,8 +487,49 @@ namespace BulkImageGenerator.Services
         }
 
         /// <summary>
-        /// Calculates the source crop rectangle from the asset bitmap for the requested fit mode.
-        /// This is the core of the "cover/contain/stretch" logic.
+        /// Resolves an image path using three strategies:
+        ///   1. Exact path as given
+        ///   2. Append common extensions if no extension present
+        ///   3. Case-insensitive filename search in the same directory
+        /// Returns null if the file cannot be found by any strategy.
+        /// </summary>
+        private static string? ResolveImagePath(string rawPath)
+        {
+            if (string.IsNullOrWhiteSpace(rawPath)) return null;
+
+            // Strategy 1: exact path
+            if (File.Exists(rawPath)) return rawPath;
+
+            // Strategy 2: try common image extensions if no extension given
+            if (string.IsNullOrEmpty(Path.GetExtension(rawPath)))
+            {
+                foreach (var ext in new[] { ".jpg", ".jpeg", ".png", ".bmp", ".gif" })
+                {
+                    string candidate = rawPath + ext;
+                    if (File.Exists(candidate)) return candidate;
+                }
+            }
+
+            // Strategy 3: case-insensitive search in parent directory
+            string? dir  = Path.GetDirectoryName(rawPath);
+            string  file = Path.GetFileName(rawPath);
+
+            if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+            {
+                string? match = Directory
+                    .GetFiles(dir)
+                    .FirstOrDefault(f => string.Equals(
+                        Path.GetFileName(f), file,
+                        StringComparison.OrdinalIgnoreCase));
+
+                if (match is not null) return match;
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Calculates the source crop rectangle for cover / contain / stretch modes.
         /// </summary>
         private static SKRect CalculateSourceRect(
             SKBitmap bitmap,
@@ -459,44 +543,37 @@ namespace BulkImageGenerator.Services
 
             return style.FitMode.ToLowerInvariant() switch
             {
-                // ── STRETCH: Use the entire source image, distort to fit destination ──
                 "stretch" => new SKRect(0, 0, srcW, srcH),
-
-                // ── CONTAIN: Scale down to fit entirely within destination ─────────────
-                // The entire source image is visible; DrawBitmap handles scaling.
-                // We return the full src rect and rely on SkiaSharp's destRect scaling.
-                "contain" => ComputeContainSrcRect(srcW, srcH, dstW, dstH, style),
-
-                // ── COVER (default): Crop the source so it fills destination ──────────
-                _ => ComputeCoverSrcRect(srcW, srcH, dstW, dstH, style),
+                "contain" => new SKRect(0, 0, srcW, srcH),
+                _         => ComputeCoverSrcRect(srcW, srcH, dstW, dstH, style)
             };
         }
 
         /// <summary>
-        /// For "cover" mode: computes the largest centered (or anchor-adjusted)
-        /// crop window in the source image that matches the destination aspect ratio.
+        /// Cover mode: crops the source so it fills the destination completely,
+        /// anchored by AnchorX/AnchorY (0.5 = center crop by default).
         /// </summary>
         private static SKRect ComputeCoverSrcRect(
-            float srcW, float srcH, float dstW, float dstH, ImageStyle style)
+            float srcW, float srcH,
+            float dstW, float dstH,
+            ImageStyle style)
         {
             float srcAspect = srcW / srcH;
             float dstAspect = dstW / dstH;
 
             float cropW, cropH;
+
             if (srcAspect > dstAspect)
             {
-                // Source is wider than destination — crop sides.
                 cropH = srcH;
                 cropW = srcH * dstAspect;
             }
             else
             {
-                // Source is taller than destination — crop top/bottom.
                 cropW = srcW;
                 cropH = srcW / dstAspect;
             }
 
-            // Apply anchor: 0.0 = left/top, 0.5 = center, 1.0 = right/bottom.
             float cropX = (srcW - cropW) * style.AnchorX;
             float cropY = (srcH - cropH) * style.AnchorY;
 
@@ -504,61 +581,88 @@ namespace BulkImageGenerator.Services
         }
 
         /// <summary>
-        /// For "contain" mode: computes a source rect that, when drawn into destRect,
-        /// will letterbox the image. We return the full source image rect; SkiaSharp
-        /// scales it to fit within destRect automatically.
+        /// Draws a visible red error box so broken images are immediately obvious
+        /// in the output instead of silently producing a blank area.
         /// </summary>
-        private static SKRect ComputeContainSrcRect(
-            float srcW, float srcH, float dstW, float dstH, ImageStyle style)
+        private static void DrawErrorBox(SKCanvas canvas, Bounds bounds, string message)
         {
-            // For "contain" we always use the entire source image.
-            // The letterboxing effect comes from the destination rect being
-            // proportionally smaller in one axis (handled by the caller adjusting destRect).
-            // A full implementation would compute an inset destRect here.
-            // For now, return the full source (equivalent to stretch in 2D terms).
-            return new SKRect(0, 0, srcW, srcH);
+            var rect = new SKRect(
+                bounds.X, bounds.Y,
+                bounds.X + bounds.Width,
+                bounds.Y + bounds.Height);
+
+            using var fillPaint = new SKPaint
+            {
+                Color = new SKColor(220, 50, 50, 100),
+                Style = SKPaintStyle.Fill
+            };
+            canvas.DrawRect(rect, fillPaint);
+
+            using var borderPaint = new SKPaint
+            {
+                Color       = SKColors.Red,
+                Style       = SKPaintStyle.Stroke,
+                StrokeWidth = 2f,
+                IsAntialias = true
+            };
+            canvas.DrawRect(rect, borderPaint);
+
+            using var textPaint = new SKPaint
+            {
+                Color       = SKColors.White,
+                TextSize    = Math.Min(14f, bounds.Height * 0.25f),
+                IsAntialias = true
+            };
+            canvas.DrawText(
+                $"! {message}",
+                bounds.X + 6f,
+                bounds.Y + textPaint.TextSize + 4f,
+                textPaint);
         }
 
-        // ── 6. Utilities ─────────────────────────────────────────────────────────
+        // ══════════════════════════════════════════════════════════════════════
+        // PRIVATE: UTILITIES
+        // ══════════════════════════════════════════════════════════════════════
 
         /// <summary>
-        /// Parses a CSS-style hex color string to an SKColor.
-        /// Supports formats: "#RGB", "#RRGGBB", "#AARRGGBB".
-        /// Falls back to black on parse failure.
+        /// Parses a hex color string to SKColor.
+        /// Supports #RGB, #RRGGBB, #AARRGGBB. Falls back to black on failure.
         /// </summary>
         private static SKColor ParseHexColor(string hex)
         {
             try
             {
-                // Remove leading '#' if present.
                 string clean = hex.TrimStart('#');
                 return clean.Length switch
                 {
-                    3  => ParseShortHex(clean),
-                    6  => new SKColor(
-                              Convert.ToByte(clean[0..2], 16),
-                              Convert.ToByte(clean[2..4], 16),
-                              Convert.ToByte(clean[4..6], 16)),
-                    8  => new SKColor(
-                              Convert.ToByte(clean[2..4], 16),  // R
-                              Convert.ToByte(clean[4..6], 16),  // G
-                              Convert.ToByte(clean[6..8], 16),  // B
-                              Convert.ToByte(clean[0..2], 16)), // A
-                    _  => SKColors.Black
+                    3 => new SKColor(
+                        (byte)(Convert.ToByte(clean[0..1], 16) * 17),
+                        (byte)(Convert.ToByte(clean[1..2], 16) * 17),
+                        (byte)(Convert.ToByte(clean[2..3], 16) * 17)),
+
+                    6 => new SKColor(
+                        Convert.ToByte(clean[0..2], 16),
+                        Convert.ToByte(clean[2..4], 16),
+                        Convert.ToByte(clean[4..6], 16)),
+
+                    8 => new SKColor(
+                        Convert.ToByte(clean[2..4], 16),
+                        Convert.ToByte(clean[4..6], 16),
+                        Convert.ToByte(clean[6..8], 16),
+                        Convert.ToByte(clean[0..2], 16)),
+
+                    _ => SKColors.Black
                 };
             }
-            catch { return SKColors.Black; }
+            catch
+            {
+                return SKColors.Black;
+            }
         }
 
-        private static SKColor ParseShortHex(string s) =>
-            new SKColor(
-                (byte)(Convert.ToByte(s[0..1], 16) * 17),
-                (byte)(Convert.ToByte(s[1..2], 16) * 17),
-                (byte)(Convert.ToByte(s[2..3], 16) * 17));
-
         /// <summary>
-        /// Derives the output filename for a row.
-        /// Priority: (1) value of fileNameColumn, (2) zero-padded row index.
+        /// Derives output filename from the designated column or falls back
+        /// to a zero-padded row index. Sanitizes invalid Windows filename characters.
         /// </summary>
         private static string DeriveFileName(
             Dictionary<string, string> row,
@@ -566,14 +670,13 @@ namespace BulkImageGenerator.Services
             int rowIndex)
         {
             if (fileNameColumn is not null
-                && row.TryGetValue(fileNameColumn, out var nameVal)
+                && row.TryGetValue(fileNameColumn, out string? nameVal)
                 && !string.IsNullOrWhiteSpace(nameVal))
             {
-                // Sanitize: remove characters not valid in Windows file names.
                 return string.Join("_", nameVal.Split(Path.GetInvalidFileNameChars()));
             }
 
-            return rowIndex.ToString("D6"); // e.g. "000042"
+            return rowIndex.ToString("D6");
         }
     }
 }

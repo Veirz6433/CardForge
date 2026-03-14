@@ -536,6 +536,7 @@
       "ExcelDataReader >= 3.7.0",
       "ExcelDataReader.DataSet >= 3.7.0",
       "SkiaSharp >= 2.88.8",
+      "SkiaSharp.NativeAssets.Win32 >= 2.88.8",
       "SkiaSharp.Views.WPF >= 2.88.8"
     ]
   },
@@ -545,11 +546,11 @@
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "C:\\Users\\vaibh\\OneDrive\\Desktop\\dextop\\codes\\Bulk Generator\\BulkImageGenerator\\BulkImageGenerator.csproj",
+      "projectUniqueName": "C:\\Users\\vaibh\\OneDrive\\Desktop\\dextop\\codes\\Bulk Generator\\CardForge\\BulkImageGenerator.csproj",
       "projectName": "BulkImageGenerator",
-      "projectPath": "C:\\Users\\vaibh\\OneDrive\\Desktop\\dextop\\codes\\Bulk Generator\\BulkImageGenerator\\BulkImageGenerator.csproj",
+      "projectPath": "C:\\Users\\vaibh\\OneDrive\\Desktop\\dextop\\codes\\Bulk Generator\\CardForge\\BulkImageGenerator.csproj",
       "packagesPath": "C:\\Users\\vaibh\\.nuget\\packages\\",
-      "outputPath": "C:\\Users\\vaibh\\OneDrive\\Desktop\\dextop\\codes\\Bulk Generator\\BulkImageGenerator\\obj\\",
+      "outputPath": "C:\\Users\\vaibh\\OneDrive\\Desktop\\dextop\\codes\\Bulk Generator\\CardForge\\obj\\",
       "projectStyle": "PackageReference",
       "configFilePaths": [
         "C:\\Users\\vaibh\\AppData\\Roaming\\NuGet\\NuGet.Config"
@@ -595,6 +596,10 @@
             "version": "[3.7.0, )"
           },
           "SkiaSharp": {
+            "target": "Package",
+            "version": "[2.88.8, )"
+          },
+          "SkiaSharp.NativeAssets.Win32": {
             "target": "Package",
             "version": "[2.88.8, )"
           },

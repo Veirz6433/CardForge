@@ -5,13 +5,30 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
+
+    <!-- Publication settings -->
+    <AssemblyName>BulkImageGenerator</AssemblyName>
+    <Version>1.0.0</Version>
+    <Company>Your Name</Company>
+    <Product>Bulk Image Generator</Product>
+    <Description>Offline bulk image generation tool</Description>
+
+    <!-- Performance: trim unused code to reduce file size -->
+    <PublishTrimmed>false</PublishTrimmed>
+
+    <!-- Show a proper window, not a console box -->
+    <ApplicationIcon>Assets\icon.ico</ApplicationIcon>
+
+    <!-- Prevents a black console window appearing behind the app -->
+    <DisableWinExeOutputInference>false</DisableWinExeOutputInference>
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="CommunityToolkit.Mvvm"       Version="8.4.0" />
-    <PackageReference Include="SkiaSharp"                   Version="2.88.8" />
-    <PackageReference Include="SkiaSharp.Views.WPF"         Version="2.88.8" />
-    <PackageReference Include="ExcelDataReader"             Version="3.7.0" />
-    <PackageReference Include="ExcelDataReader.DataSet"     Version="3.7.0" />
+    <PackageReference Include="CommunityToolkit.Mvvm"             Version="8.4.0"/>
+    <PackageReference Include="SkiaSharp"                         Version="2.88.8"/>
+    <PackageReference Include="SkiaSharp.Views.WPF"               Version="2.88.8"/>
+    <PackageReference Include="SkiaSharp.NativeAssets.Win32"      Version="2.88.8"/>
+    <PackageReference Include="ExcelDataReader"                   Version="3.7.0"/>
+    <PackageReference Include="ExcelDataReader.DataSet"           Version="3.7.0"/>
   </ItemGroup>
 </Project>

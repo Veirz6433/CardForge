@@ -1,36 +1,35 @@
 <Window x:Class="BulkImageGenerator.Views.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:vm="clr-namespace:BulkImageGenerator.ViewModels"
         xmlns:conv="clr-namespace:BulkImageGenerator.Converters"
-        Title="{Binding CurrentTemplate.Name, StringFormat='Bulk Image Generator — {0}'}"
+        Title="CardForge - Bulk File Generator"
         Height="820" Width="1280"
         MinHeight="640" MinWidth="960"
         Background="#1E1E2E">
 
     <Window.Resources>
-        <conv:BoolToVisibilityConverter x:Key="BoolToVisibility" />
+        <conv:BoolToVisibilityConverter x:Key="BoolToVisibility"/>
 
-        <!-- ══ COLOR PALETTE ══════════════════════════════════════════════════ -->
-        <SolidColorBrush x:Key="SurfaceBrush"    Color="#2A2A3E"/>
-        <SolidColorBrush x:Key="PanelBrush"      Color="#313148"/>
-        <SolidColorBrush x:Key="AccentBrush"     Color="#7C6FE0"/>
+        <!-- Colors -->
+        <SolidColorBrush x:Key="SurfaceBrush"     Color="#2A2A3E"/>
+        <SolidColorBrush x:Key="PanelBrush"       Color="#313148"/>
+        <SolidColorBrush x:Key="AccentBrush"      Color="#7C6FE0"/>
         <SolidColorBrush x:Key="AccentHoverBrush" Color="#9B8FFF"/>
-        <SolidColorBrush x:Key="DangerBrush"     Color="#E05C5C"/>
-        <SolidColorBrush x:Key="TextPrimary"     Color="#EEEEF5"/>
-        <SolidColorBrush x:Key="TextSecondary"   Color="#9090AA"/>
-        <SolidColorBrush x:Key="BorderBrush"     Color="#44445A"/>
-        <SolidColorBrush x:Key="SelectionBrush"  Color="#7C6FE0"/>
+        <SolidColorBrush x:Key="DangerBrush"      Color="#E05C5C"/>
+        <SolidColorBrush x:Key="SuccessBrush"     Color="#3D8A6E"/>
+        <SolidColorBrush x:Key="TextPrimary"      Color="#EEEEF5"/>
+        <SolidColorBrush x:Key="TextSecondary"    Color="#9090AA"/>
+        <SolidColorBrush x:Key="BorderBrush"      Color="#44445A"/>
 
-        <!-- ══ BUTTON STYLE ═══════════════════════════════════════════════════ -->
+        <!-- Accent Button -->
         <Style x:Key="AccentButton" TargetType="Button">
-            <Setter Property="Background"   Value="{StaticResource AccentBrush}"/>
-            <Setter Property="Foreground"   Value="White"/>
+            <Setter Property="Background"      Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Foreground"      Value="White"/>
             <Setter Property="BorderThickness" Value="0"/>
-            <Setter Property="Padding"      Value="12,6"/>
-            <Setter Property="FontSize"     Value="12"/>
-            <Setter Property="FontWeight"   Value="SemiBold"/>
-            <Setter Property="Cursor"       Value="Hand"/>
+            <Setter Property="Padding"         Value="12,7"/>
+            <Setter Property="FontSize"        Value="12"/>
+            <Setter Property="FontWeight"      Value="SemiBold"/>
+            <Setter Property="Cursor"          Value="Hand"/>
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
@@ -45,7 +44,7 @@
                                 <Setter Property="Background" Value="{StaticResource AccentHoverBrush}"/>
                             </Trigger>
                             <Trigger Property="IsEnabled" Value="False">
-                                <Setter Property="Opacity" Value="0.5"/>
+                                <Setter Property="Opacity" Value="0.4"/>
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -57,138 +56,75 @@
             <Setter Property="Background" Value="{StaticResource DangerBrush}"/>
         </Style>
 
-        <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource AccentButton}">
-            <Setter Property="Background" Value="Transparent"/>
-            <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+        <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource AccentButton}">
+            <Setter Property="Background" Value="{StaticResource SuccessBrush}"/>
         </Style>
 
-        <!-- ══ SECTION LABEL STYLE ════════════════════════════════════════════ -->
-        <!-- ✅ FIXED: Pure WPF properties only -->
+        <Style x:Key="GhostButton" TargetType="Button" BasedOn="{StaticResource AccentButton}">
+            <Setter Property="Background"      Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="1"/>
+            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
+        </Style>
+
+        <!-- Section label -->
         <Style x:Key="SectionLabel" TargetType="TextBlock">
-            <Setter Property="Foreground"   Value="{StaticResource TextSecondary}"/>
-            <Setter Property="FontSize"     Value="10"/>
-            <Setter Property="FontWeight"   Value="Bold"/>
-            <Setter Property="Margin"       Value="0,12,0,4"/>
+            <Setter Property="Foreground"  Value="{StaticResource TextSecondary}"/>
+            <Setter Property="FontSize"    Value="10"/>
+            <Setter Property="FontWeight"  Value="Bold"/>
+            <Setter Property="Margin"      Value="0,14,0,4"/>
             <Setter Property="Typography.Capitals" Value="AllSmallCaps"/>
         </Style>
 
-        <!-- ══ INPUT STYLE ════════════════════════════════════════════════════ -->
+        <!-- Dark TextBox -->
         <Style x:Key="DarkTextBox" TargetType="TextBox">
-            <Setter Property="Background"  Value="#1E1E2E"/>
-            <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
+            <Setter Property="Background"      Value="#1E1E2E"/>
+            <Setter Property="Foreground"      Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush"     Value="{StaticResource BorderBrush}"/>
             <Setter Property="BorderThickness" Value="1"/>
-            <Setter Property="Padding"     Value="6,4"/>
-            <Setter Property="FontSize"    Value="12"/>
-            <Setter Property="CaretBrush"  Value="{StaticResource AccentBrush}"/>
+            <Setter Property="Padding"         Value="6,5"/>
+            <Setter Property="FontSize"        Value="12"/>
+            <Setter Property="CaretBrush"      Value="{StaticResource AccentBrush}"/>
         </Style>
 
+        <!-- Dark ComboBox — full restyle including dropdown items -->
         <Style x:Key="DarkComboBox" TargetType="ComboBox">
-            <Setter Property="Background"  Value="#1E1E2E"/>
-            <Setter Property="Foreground"  Value="{StaticResource TextPrimary}"/>
-            <Setter Property="BorderBrush" Value="{StaticResource BorderBrush}"/>
-            <Setter Property="Padding"     Value="6,4"/>
-            <Setter Property="FontSize"    Value="12"/>
+            <Setter Property="Background"             Value="#1E1E2E"/>
+            <Setter Property="Foreground"             Value="{StaticResource TextPrimary}"/>
+            <Setter Property="BorderBrush"            Value="{StaticResource BorderBrush}"/>
+            <Setter Property="BorderThickness"        Value="1"/>
+            <Setter Property="Padding"                Value="6,5"/>
+            <Setter Property="FontSize"               Value="12"/>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <!-- ↓ This is the key line — black text on white dropdown background -->
+                        <Setter Property="Foreground"  Value="#111111"/>
+                        <Setter Property="Background"  Value="#FFFFFF"/>
+                        <Setter Property="FontSize"    Value="12"/>
+                        <Setter Property="Padding"     Value="8,5"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="#7C6FE0"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="#5A4FBF"/>
+                                <Setter Property="Foreground" Value="White"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
         </Style>
 
-        <!-- ══ PLACEHOLDER ITEM TEMPLATE ══════════════════════════════════════
-             Each placeholder is rendered as a semi-transparent bordered rectangle
-             on the canvas. When selected, it shows resize handles (8 Thumbs).
-             The ItemContainerStyle sets Canvas.Left/Top for positioning.       -->
-        <DataTemplate x:Key="PlaceholderTemplate" DataType="{x:Type vm:PlaceholderViewModel}">
-            <Grid x:Name="PlaceholderRoot"
-                  Width="{Binding Width}"
-                  Height="{Binding Height}"
-                  Cursor="SizeAll"
-                  Tag="{Binding}">
 
-                <!-- ── Body: colored border showing type ── -->
-                <Border x:Name="PlaceholderBorder"
-                        BorderThickness="1.5"
-                        CornerRadius="2"
-                        Background="#33FFFFFF">
-                    <Border.BorderBrush>
-                        <SolidColorBrush Color="#7C6FE0" Opacity="0.8"/>
-                    </Border.BorderBrush>
-
-                    <!-- Variable name label -->
-                    <TextBlock Text="{Binding DisplayLabel}"
-                               Foreground="White"
-                               FontSize="11"
-                               FontWeight="SemiBold"
-                               HorizontalAlignment="Center"
-                               VerticalAlignment="Center"
-                               TextWrapping="NoWrap"
-                               Opacity="0.9"/>
-                </Border>
-
-                <!-- ── Selection highlight overlay ── -->
-                <Border x:Name="SelectionBorder"
-                        BorderThickness="2"
-                        CornerRadius="2"
-                        BorderBrush="{StaticResource SelectionBrush}"
-                        Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}"/>
-
-                <!-- ── Resize handles (8-point, shown only when selected) ──
-                     Thumbs are placed at corners and edge midpoints.
-                     DragDelta events are handled in code-behind (pure view logic).
-                     Tags encode which handle: "TL","TC","TR","ML","MR","BL","BC","BR" -->
-                <Canvas x:Name="ResizeHandles"
-                        Visibility="{Binding IsSelected, Converter={StaticResource BoolToVisibility}}">
-
-                    <!-- Top-Left -->
-                    <Thumb Canvas.Left="-5" Canvas.Top="-5"
-                           Width="10" Height="10"
-                           Tag="TL" Cursor="SizeNWSE"
-                           Style="{StaticResource ResizeThumbStyle}"/>
-                    <!-- Top-Center -->
-                    <Thumb Canvas.Left="{Binding HalfWidthOffset}" Canvas.Top="-5"
-                           Width="10" Height="10"
-                           Tag="TC" Cursor="SizeNS"
-                           Style="{StaticResource ResizeThumbStyle}"/>
-                    <!-- Top-Right -->
-                    <Thumb Canvas.Left="{Binding WidthOffset}" Canvas.Top="-5"
-                           Width="10" Height="10"
-                           Tag="TR" Cursor="SizeNESW"
-                           Style="{StaticResource ResizeThumbStyle}"/>
-                    <!-- Middle-Left -->
-                    <Thumb Canvas.Left="-5" Canvas.Top="{Binding HalfHeightOffset}"
-                           Width="10" Height="10"
-                           Tag="ML" Cursor="SizeWE"
-                           Style="{StaticResource ResizeThumbStyle}"/>
-                    <!-- Middle-Right -->
-                    <Thumb Canvas.Left="{Binding WidthOffset}" Canvas.Top="{Binding HalfHeightOffset}"
-                           Width="10" Height="10"
-                           Tag="MR" Cursor="SizeWE"
-                           Style="{StaticResource ResizeThumbStyle}"/>
-                    <!-- Bottom-Left -->
-                    <Thumb Canvas.Left="-5" Canvas.Top="{Binding HeightOffset}"
-                           Width="10" Height="10"
-                           Tag="BL" Cursor="SizeNESW"
-                           Style="{StaticResource ResizeThumbStyle}"/>
-                    <!-- Bottom-Center -->
-                    <Thumb Canvas.Left="{Binding HalfWidthOffset}" Canvas.Top="{Binding HeightOffset}"
-                           Width="10" Height="10"
-                           Tag="BC" Cursor="SizeNS"
-                           Style="{StaticResource ResizeThumbStyle}"/>
-                    <!-- Bottom-Right -->
-                    <Thumb Canvas.Left="{Binding WidthOffset}" Canvas.Top="{Binding HeightOffset}"
-                           Width="10" Height="10"
-                           Tag="BR" Cursor="SizeNWSE"
-                           Style="{StaticResource ResizeThumbStyle}"/>
-                </Canvas>
-            </Grid>
-        </DataTemplate>
-
-        <!-- Resize Thumb visual style (small square handle) -->
+        <!-- Resize Thumb -->
         <Style x:Key="ResizeThumbStyle" TargetType="Thumb">
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Thumb">
                         <Border Background="{StaticResource AccentBrush}"
-                                BorderBrush="White"
-                                BorderThickness="1"
+                                BorderBrush="White" BorderThickness="1"
                                 CornerRadius="2"/>
                     </ControlTemplate>
                 </Setter.Value>
@@ -197,51 +133,49 @@
 
     </Window.Resources>
 
-    <!-- ══════════════════════════════════════════════════════════════════════
-         ROOT LAYOUT: Menu + 3-Column Body + Status Bar
-         ════════════════════════════════════════════════════════════════════ -->
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="40"/>    <!-- Menu Bar -->
-            <RowDefinition Height="*"/>     <!-- Main Body -->
-            <RowDefinition Height="36"/>    <!-- Status Bar -->
+            <RowDefinition Height="44"/>   <!-- Top bar -->
+            <RowDefinition Height="*"/>    <!-- Body -->
+            <RowDefinition Height="32"/>   <!-- Status bar -->
         </Grid.RowDefinitions>
 
-        <!-- ══ MENU BAR ═══════════════════════════════════════════════════════ -->
-        <Border Grid.Row="0" Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1">
-            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="8,0">
-
-                <TextBlock Text="🎨" FontSize="18" VerticalAlignment="Center" Margin="0,0,8,0"/>
+        <!-- ══════════════════════════════════════════════════════════════════
+             TOP BAR
+             ══════════════════════════════════════════════════════════════ -->
+        <Border Grid.Row="0"
+                Background="{StaticResource PanelBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1">
+            <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="12,0">
+                <TextBlock Text="🎨" FontSize="20" VerticalAlignment="Center" Margin="0,0,8,0"/>
                 <TextBlock Text="Bulk Image Generator"
                            Foreground="{StaticResource TextPrimary}"
                            FontSize="14" FontWeight="Bold"
-                           VerticalAlignment="Center" Margin="0,0,24,0"/>
-
-                <Button Content="📂 New / Load Template"
+                           VerticalAlignment="Center" Margin="0,0,28,0"/>
+                <Button Content="📂 Load Template"
                         Command="{Binding LoadTemplateCommand}"
-                        Style="{StaticResource GhostButton}" Margin="2,0"/>
+                        Style="{StaticResource GhostButton}" Margin="0,0,6,0"/>
                 <Button Content="💾 Save Template"
                         Command="{Binding SaveTemplateCommand}"
-                        Style="{StaticResource GhostButton}" Margin="2,0"/>
-                <Separator Background="{StaticResource BorderBrush}" Width="1" Margin="8,6"/>
+                        Style="{StaticResource GhostButton}" Margin="0,0,6,0"/>
                 <Button Content="🖼 Background Image"
                         Command="{Binding LoadBackgroundImageCommand}"
-                        Style="{StaticResource GhostButton}" Margin="2,0"/>
+                        Style="{StaticResource GhostButton}"/>
             </StackPanel>
         </Border>
 
-        <!-- ══ MAIN BODY (3 columns) ═══════════════════════════════════════════ -->
+        <!-- ══════════════════════════════════════════════════════════════════
+             BODY — 3 columns
+             ══════════════════════════════════════════════════════════════ -->
         <Grid Grid.Row="1">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="200"/>         <!-- Left: Tools Panel -->
-                <ColumnDefinition Width="*"/>           <!-- Center: Canvas -->
-                <ColumnDefinition Width="260"/>         <!-- Right: Properties Panel -->
+                <ColumnDefinition Width="210"/>  <!-- Left panel -->
+                <ColumnDefinition Width="*"/>    <!-- Canvas -->
+                <ColumnDefinition Width="260"/>  <!-- Properties panel -->
             </Grid.ColumnDefinitions>
 
-            <!-- ─────────────────────────────────────────────────────────────────
-                 LEFT PANEL: Tools + Excel Import + Generate
-                 ───────────────────────────────────────────────────────────────── -->
+            <!-- ══ LEFT PANEL ═══════════════════════════════════════════════ -->
             <Border Grid.Column="0"
                     Background="{StaticResource PanelBrush}"
                     BorderBrush="{StaticResource BorderBrush}"
@@ -249,77 +183,67 @@
                 <ScrollViewer VerticalScrollBarVisibility="Auto">
                     <StackPanel Margin="12">
 
-                        <!-- Section: Placeholders -->
-                        <TextBlock Text="PLACEHOLDERS" Style="{StaticResource SectionLabel}"/>
-
+                        <!-- Placeholders -->
+                        <TextBlock Text="Placeholders" Style="{StaticResource SectionLabel}"/>
                         <Button Content="＋ Add Text Block"
                                 Command="{Binding AddTextPlaceholderCommand}"
                                 Style="{StaticResource AccentButton}"
-                                HorizontalAlignment="Stretch"
-                                Margin="0,0,0,6"/>
-
+                                HorizontalAlignment="Stretch" Margin="0,0,0,6"/>
                         <Button Content="＋ Add Image Box"
                                 Command="{Binding AddImagePlaceholderCommand}"
                                 Style="{StaticResource AccentButton}"
                                 Background="#4E7FD4"
-                                HorizontalAlignment="Stretch"
-                                Margin="0,0,0,6"/>
-
+                                HorizontalAlignment="Stretch" Margin="0,0,0,6"/>
                         <Button Content="🗑 Delete Selected"
                                 Command="{Binding DeleteSelectedPlaceholderCommand}"
                                 Style="{StaticResource DangerButton}"
-                                HorizontalAlignment="Stretch"
-                                Margin="0,0,0,4"/>
+                                HorizontalAlignment="Stretch"/>
 
-                        <!-- Section: Canvas Size -->
-                        <TextBlock Text="CANVAS SIZE" Style="{StaticResource SectionLabel}"/>
+                        <!-- Canvas Size -->
+                        <TextBlock Text="Canvas Size (px)" Style="{StaticResource SectionLabel}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition/><ColumnDefinition Width="Auto"/>
-                                <ColumnDefinition/><ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition/>
+                                <ColumnDefinition Width="16"/>
+                                <ColumnDefinition/>
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0"
-                                     Style="{StaticResource DarkTextBox}"
-                                     Text="{Binding CurrentTemplate.CanvasWidth, UpdateSourceTrigger=PropertyChanged}"/>
-                            <TextBlock Grid.Column="1" Text=" × "
+                            <TextBox Grid.Column="0" Style="{StaticResource DarkTextBox}"
+                                     Text="{Binding CurrentTemplate.CanvasWidth,
+                                         UpdateSourceTrigger=PropertyChanged}"/>
+                            <TextBlock Grid.Column="1" Text="×"
                                        Foreground="{StaticResource TextSecondary}"
-                                       VerticalAlignment="Center" Margin="2,0"/>
-                            <TextBox Grid.Column="2"
-                                     Style="{StaticResource DarkTextBox}"
-                                     Text="{Binding CurrentTemplate.CanvasHeight, UpdateSourceTrigger=PropertyChanged}"/>
-                            <TextBlock Grid.Column="3" Text=" px"
-                                       Foreground="{StaticResource TextSecondary}"
-                                       VerticalAlignment="Center" Margin="2,0"/>
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"/>
+                            <TextBox Grid.Column="2" Style="{StaticResource DarkTextBox}"
+                                     Text="{Binding CurrentTemplate.CanvasHeight,
+                                         UpdateSourceTrigger=PropertyChanged}"/>
                         </Grid>
 
-                        <!-- Section: Output Settings -->
-                        <TextBlock Text="OUTPUT" Style="{StaticResource SectionLabel}"/>
-
-                        <TextBlock Text="Format" Foreground="{StaticResource TextSecondary}"
-                                   FontSize="11" Margin="0,0,0,2"/>
+                        <!-- Output Format -->
+                        <TextBlock Text="Output Format" Style="{StaticResource SectionLabel}"/>
                         <ComboBox Style="{StaticResource DarkComboBox}"
                                   SelectedValue="{Binding CurrentTemplate.OutputFormat}"
-                                  SelectedValuePath="Content">
+                                  SelectedValuePath="Content"
+                                  Margin="0,0,0,6">
                             <ComboBoxItem Content="jpeg"/>
                             <ComboBoxItem Content="png"/>
                         </ComboBox>
 
-                        <TextBlock Text="JPEG Quality (1-100)"
+                        <TextBlock Text="JPEG Quality"
                                    Foreground="{StaticResource TextSecondary}"
-                                   FontSize="11" Margin="0,8,0,2"/>
+                                   FontSize="11" Margin="0,0,0,2"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition/><ColumnDefinition Width="36"/>
+                                <ColumnDefinition/>
+                                <ColumnDefinition Width="32"/>
                             </Grid.ColumnDefinitions>
                             <Slider Grid.Column="0" Minimum="1" Maximum="100"
                                     Value="{Binding CurrentTemplate.OutputQuality}"
-                                    VerticalAlignment="Center"
-                                    Foreground="{StaticResource AccentBrush}"/>
+                                    VerticalAlignment="Center"/>
                             <TextBlock Grid.Column="1"
                                        Text="{Binding CurrentTemplate.OutputQuality}"
                                        Foreground="{StaticResource TextPrimary}"
-                                       VerticalAlignment="Center"
-                                       Margin="4,0,0,0"/>
+                                       VerticalAlignment="Center" Margin="4,0,0,0"/>
                         </Grid>
 
                         <TextBlock Text="Output Filename Column"
@@ -327,71 +251,89 @@
                                    FontSize="11" Margin="0,8,0,2"/>
                         <TextBox Style="{StaticResource DarkTextBox}"
                                  Text="{Binding FileNameColumn, UpdateSourceTrigger=PropertyChanged}"
-                                 ToolTip="Excel column to use as the output filename (optional)"/>
+                                 ToolTip="Excel column header to use as filename (optional)"/>
 
-                        <!-- Section: Excel -->
-                        <TextBlock Text="EXCEL DATA" Style="{StaticResource SectionLabel}"/>
+                        <!-- Image Assets Folder -->
+                        <TextBlock Text="Image Assets Folder" Style="{StaticResource SectionLabel}"/>
+                        <TextBlock Text="Image columns in Excel use filenames only (e.g. alice.jpg)"
+                                   Foreground="{StaticResource TextSecondary}"
+                                   FontSize="10" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Background="#1E1E2E"
+                                    BorderBrush="{StaticResource BorderBrush}"
+                                    BorderThickness="1" CornerRadius="4" Padding="6,5">
+                                <TextBlock Text="{Binding AssetsFolderName}"
+                                           Foreground="{StaticResource TextPrimary}"
+                                           FontSize="11" TextTrimming="CharacterEllipsis"/>
+                            </Border>
+                            <Button Grid.Column="1" Content="…"
+                                    Command="{Binding BrowseAssetsFolderCommand}"
+                                    Style="{StaticResource GhostButton}"
+                                    Margin="6,0,0,0" Padding="10,5"/>
+                        </Grid>
 
+                        <!-- Excel Import -->
+                        <TextBlock Text="Excel Data" Style="{StaticResource SectionLabel}"/>
                         <Button Content="📊 Import Excel (.xlsx / .xls)"
                                 Command="{Binding ImportExcelCommand}"
-                                Style="{StaticResource AccentButton}"
-                                Background="#3D8A6E"
-                                HorizontalAlignment="Stretch"
-                                Margin="0,0,0,4"/>
-
-                        <Border Background="#1E1E2E" CornerRadius="4" Padding="8,6" Margin="0,0,0,4">
+                                Style="{StaticResource SuccessButton}"
+                                HorizontalAlignment="Stretch" Margin="0,0,0,6"/>
+                        <Border Background="#1E1E2E" CornerRadius="4" Padding="8,6">
                             <StackPanel>
                                 <TextBlock Text="{Binding ExcelFileName}"
                                            Foreground="{StaticResource TextPrimary}"
                                            FontSize="11" TextWrapping="Wrap"/>
-                                <TextBlock Foreground="{StaticResource TextSecondary}" FontSize="10"
-                                           Margin="0,2,0,0">
+                                <TextBlock Foreground="{StaticResource TextSecondary}"
+                                           FontSize="10" Margin="0,2,0,0">
                                     <Run Text="{Binding ExcelRowCount, Mode=OneWay}"/>
                                     <Run Text=" rows detected"/>
                                 </TextBlock>
                             </StackPanel>
                         </Border>
 
-                        <!-- Section: Output Directory -->
-                        <TextBlock Text="OUTPUT FOLDER" Style="{StaticResource SectionLabel}"/>
+                        <!-- Output Directory -->
+                        <TextBlock Text="Output Folder" Style="{StaticResource SectionLabel}"/>
                         <Grid>
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition/><ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition/>
+                                <ColumnDefinition Width="Auto"/>
                             </Grid.ColumnDefinitions>
-                            <TextBox Grid.Column="0"
-                                     Style="{StaticResource DarkTextBox}"
+                            <TextBox Grid.Column="0" Style="{StaticResource DarkTextBox}"
                                      Text="{Binding OutputDirectory}"
-                                     IsReadOnly="True"
-                                     FontSize="10"/>
+                                     IsReadOnly="True" FontSize="10"/>
                             <Button Grid.Column="1" Content="…"
                                     Command="{Binding BrowseOutputDirectoryCommand}"
                                     Style="{StaticResource GhostButton}"
-                                    Margin="4,0,0,0" Padding="8,4"/>
+                                    Margin="6,0,0,0" Padding="10,5"/>
                         </Grid>
 
-                        <!-- Section: Generate -->
-                        <TextBlock Text="GENERATE" Style="{StaticResource SectionLabel}"/>
-
+                        <!-- Generate -->
+                        <TextBlock Text="Generate" Style="{StaticResource SectionLabel}"/>
                         <Button Content="⚡ Generate All Images"
                                 Command="{Binding GenerateAllCommand}"
                                 Style="{StaticResource AccentButton}"
                                 HorizontalAlignment="Stretch"
-                                Margin="0,0,0,6"
                                 FontSize="13" Padding="12,10"
-                                IsEnabled="{Binding IsGenerating,
-                                    Converter={StaticResource BoolToVisibility},
-                                    ConverterParameter=Inverse}"/>
+                                Margin="0,0,0,6">
+                            <Button.IsEnabled>
+                                <Binding Path="IsGenerating"
+                                         Converter="{StaticResource BoolToVisibility}"
+                                         ConverterParameter="Inverse"/>
+                            </Button.IsEnabled>
+                        </Button>
 
-                        <Button Content="⛔ Cancel"
+                        <Button Content="⛔ Cancel Generation"
                                 Command="{Binding GenerateAllCancelCommand}"
                                 Style="{StaticResource DangerButton}"
                                 HorizontalAlignment="Stretch"
                                 Visibility="{Binding IsGenerating,
                                     Converter={StaticResource BoolToVisibility}}"/>
 
-                        <!-- Progress -->
-                        <ProgressBar Height="8"
-                                     Margin="0,8,0,4"
+                        <ProgressBar Height="8" Margin="0,10,0,4"
                                      Minimum="0"
                                      Maximum="{Binding ProgressMax}"
                                      Value="{Binding ProgressValue}"
@@ -400,91 +342,142 @@
 
                         <TextBlock Text="{Binding StatusMessage}"
                                    Foreground="{StaticResource TextSecondary}"
-                                   FontSize="10"
-                                   TextWrapping="Wrap"/>
+                                   FontSize="10" TextWrapping="Wrap"/>
 
                     </StackPanel>
                 </ScrollViewer>
             </Border>
 
-            <!-- ─────────────────────────────────────────────────────────────────
-                 CENTER PANEL: Template Canvas Editor
-                 ───────────────────────────────────────────────────────────────── -->
+            <!-- ══ CENTER CANVAS ═════════════════════════════════════════════ -->
             <Border Grid.Column="1" Background="#16161F">
                 <ScrollViewer HorizontalScrollBarVisibility="Auto"
-                              VerticalScrollBarVisibility="Auto"
-                              x:Name="CanvasScrollViewer">
-
-                    <!-- The outer container centers the canvas in the scroll area -->
+                              VerticalScrollBarVisibility="Auto">
                     <Grid HorizontalAlignment="Center"
                           VerticalAlignment="Center"
                           Margin="40">
 
-                        <!-- Drop shadow effect for the canvas -->
-                        <Border Background="Transparent" Margin="4">
+                        <Border>
                             <Border.Effect>
-                                <DropShadowEffect Color="Black" BlurRadius="20"
-                                                  ShadowDepth="4" Opacity="0.6"/>
+                                <DropShadowEffect Color="Black" BlurRadius="24"
+                                                  ShadowDepth="6" Opacity="0.7"/>
                             </Border.Effect>
 
-                            <!-- ── The template canvas ──
-                                 Width/Height bind to the template's output pixel dimensions.
-                                 The background Image fills the canvas.
-                                 The ItemsControl overlays placeholder boxes.            -->
                             <Grid Width="{Binding CanvasWidth}"
                                   Height="{Binding CanvasHeight}"
-                                  ClipToBounds="True"
-                                  x:Name="TemplateCanvasRoot">
+                                  ClipToBounds="True">
 
-                                <!-- Background image fill -->
+                                <!-- Background image -->
                                 <Image Source="{Binding BackgroundImagePath}"
                                        Stretch="Fill"
                                        IsHitTestVisible="False"/>
 
-                                <!-- Checkerboard fallback when no background is loaded -->
-                                <Border Background="Transparent"
-                                        IsHitTestVisible="False"
-                                        Visibility="{Binding BackgroundImagePath,
-                                            Converter={StaticResource BoolToVisibility},
-                                            ConverterParameter=Inverse}">
-                                    <TextBlock Text="Click 'Background Image' to load a template background"
-                                               Foreground="#44444A"
-                                               FontSize="14" FontStyle="Italic"
-                                               HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"/>
-                                </Border>
+                                <!-- Empty state hint -->
+                                <TextBlock IsHitTestVisible="False"
+                                           Text="Load a background image to start"
+                                           Foreground="#33FFFFFF" FontSize="16"
+                                           FontStyle="Italic"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center">
+                                    <TextBlock.Visibility>
+                                        <Binding Path="BackgroundImagePath"
+                                                 Converter="{StaticResource BoolToVisibility}"
+                                                 ConverterParameter="Inverse"/>
+                                    </TextBlock.Visibility>
+                                </TextBlock>
 
-                                <!-- ── Placeholder ItemsControl ──
-                                     ItemsPanel is a Canvas so placeholders are positioned absolutely.
-                                     ItemContainerStyle sets Canvas.Left/Top from the VM's Left/Top.
-                                     This is the correct WPF binding pattern for canvas item placement [web:21]. -->
-                                <ItemsControl ItemsSource="{Binding Placeholders}"
-                                              ItemTemplate="{StaticResource PlaceholderTemplate}"
-                                              x:Name="PlaceholdersControl">
+                                <!-- Placeholder ItemsControl -->
+                                <ItemsControl ItemsSource="{Binding Placeholders}">
 
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate>
-                                            <Canvas IsHitTestVisible="True"
-                                                    Background="Transparent"
-                                                    MouseDown="Canvas_MouseDown"/>
+                                            <Canvas Background="Transparent"
+                                                    MouseLeftButtonDown="Canvas_MouseDown"/>
                                         </ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
 
-                                    <!-- KEY: Canvas.Left/Top must be set on the ContentPresenter
-                                         (direct child of Canvas), NOT inside the DataTemplate.
-                                         This is the canonical solution from Stack Overflow [web:24]. -->
                                     <ItemsControl.ItemContainerStyle>
                                         <Style TargetType="ContentPresenter">
                                             <Setter Property="Canvas.Left" Value="{Binding Left}"/>
                                             <Setter Property="Canvas.Top"  Value="{Binding Top}"/>
-                                            <EventSetter Event="MouseDown"
-                                                         Handler="PlaceholderItem_MouseDown"/>
-                                            <EventSetter Event="MouseMove"
-                                                         Handler="PlaceholderItem_MouseMove"/>
-                                            <EventSetter Event="MouseUp"
-                                                         Handler="PlaceholderItem_MouseUp"/>
                                         </Style>
                                     </ItemsControl.ItemContainerStyle>
+
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Width="{Binding Width}"
+                                                  Height="{Binding Height}"
+                                                  Cursor="SizeAll"
+                                                  MouseLeftButtonDown="Placeholder_MouseLeftButtonDown"
+                                                  MouseMove="Placeholder_MouseMove"
+                                                  MouseLeftButtonUp="Placeholder_MouseLeftButtonUp">
+
+                                                <!-- Body -->
+                                                <Border BorderThickness="1.5" CornerRadius="3">
+                                                    <Border.BorderBrush>
+                                                        <SolidColorBrush Color="#7C6FE0"/>
+                                                    </Border.BorderBrush>
+                                                    <Border.Background>
+                                                        <SolidColorBrush Color="#7C6FE0" Opacity="0.18"/>
+                                                    </Border.Background>
+                                                    <TextBlock Text="{Binding DisplayLabel}"
+                                                               Foreground="White"
+                                                               FontSize="11" FontWeight="SemiBold"
+                                                               HorizontalAlignment="Center"
+                                                               VerticalAlignment="Center"
+                                                               IsHitTestVisible="False"/>
+                                                </Border>
+
+                                                <!-- Selection ring -->
+                                                <Border BorderThickness="2" CornerRadius="3"
+                                                        IsHitTestVisible="False"
+                                                        Visibility="{Binding IsSelected,
+                                                            Converter={StaticResource BoolToVisibility}}">
+                                                    <Border.BorderBrush>
+                                                        <SolidColorBrush Color="#FFFFFF" Opacity="0.9"/>
+                                                    </Border.BorderBrush>
+                                                </Border>
+
+                                                <!-- Resize handles -->
+                                                <Canvas IsHitTestVisible="True"
+                                                        Visibility="{Binding IsSelected,
+                                                            Converter={StaticResource BoolToVisibility}}">
+                                                    <Thumb Canvas.Left="-5"  Canvas.Top="-5"
+                                                           Width="10" Height="10" Tag="TL" Cursor="SizeNWSE"
+                                                           DragDelta="ResizeThumb_DragDelta"
+                                                           Style="{StaticResource ResizeThumbStyle}"/>
+                                                    <Thumb Canvas.Left="{Binding HalfWidthOffset}" Canvas.Top="-5"
+                                                           Width="10" Height="10" Tag="TC" Cursor="SizeNS"
+                                                           DragDelta="ResizeThumb_DragDelta"
+                                                           Style="{StaticResource ResizeThumbStyle}"/>
+                                                    <Thumb Canvas.Left="{Binding WidthOffset}" Canvas.Top="-5"
+                                                           Width="10" Height="10" Tag="TR" Cursor="SizeNESW"
+                                                           DragDelta="ResizeThumb_DragDelta"
+                                                           Style="{StaticResource ResizeThumbStyle}"/>
+                                                    <Thumb Canvas.Left="-5" Canvas.Top="{Binding HalfHeightOffset}"
+                                                           Width="10" Height="10" Tag="ML" Cursor="SizeWE"
+                                                           DragDelta="ResizeThumb_DragDelta"
+                                                           Style="{StaticResource ResizeThumbStyle}"/>
+                                                    <Thumb Canvas.Left="{Binding WidthOffset}" Canvas.Top="{Binding HalfHeightOffset}"
+                                                           Width="10" Height="10" Tag="MR" Cursor="SizeWE"
+                                                           DragDelta="ResizeThumb_DragDelta"
+                                                           Style="{StaticResource ResizeThumbStyle}"/>
+                                                    <Thumb Canvas.Left="-5" Canvas.Top="{Binding HeightOffset}"
+                                                           Width="10" Height="10" Tag="BL" Cursor="SizeNESW"
+                                                           DragDelta="ResizeThumb_DragDelta"
+                                                           Style="{StaticResource ResizeThumbStyle}"/>
+                                                    <Thumb Canvas.Left="{Binding HalfWidthOffset}" Canvas.Top="{Binding HeightOffset}"
+                                                           Width="10" Height="10" Tag="BC" Cursor="SizeNS"
+                                                           DragDelta="ResizeThumb_DragDelta"
+                                                           Style="{StaticResource ResizeThumbStyle}"/>
+                                                    <Thumb Canvas.Left="{Binding WidthOffset}" Canvas.Top="{Binding HeightOffset}"
+                                                           Width="10" Height="10" Tag="BR" Cursor="SizeNWSE"
+                                                           DragDelta="ResizeThumb_DragDelta"
+                                                           Style="{StaticResource ResizeThumbStyle}"/>
+                                                </Canvas>
+
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
 
                                 </ItemsControl>
 
@@ -494,196 +487,205 @@
                 </ScrollViewer>
             </Border>
 
-            <!-- ─────────────────────────────────────────────────────────────────
-                 RIGHT PANEL: Properties Editor
-                 ───────────────────────────────────────────────────────────────── -->
-            <!-- ✅ FIXED: Border has one child (Grid), Grid holds both children -->
-<Border Grid.Column="2"
-        Background="{StaticResource PanelBrush}"
-        BorderBrush="{StaticResource BorderBrush}"
-        BorderThickness="1,0,0,0">
+            <!-- ══ RIGHT PROPERTIES PANEL ════════════════════════════════════ -->
+            <Border Grid.Column="2"
+                    Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource BorderBrush}"
+                    BorderThickness="1,0,0,0">
+                <Grid>
+                    <!-- No selection state -->
+                    <TextBlock Text="Select a placeholder&#10;to edit its properties."
+                               Foreground="{StaticResource TextSecondary}"
+                               FontSize="13" FontStyle="Italic"
+                               TextAlignment="Center"
+                               HorizontalAlignment="Center"
+                               VerticalAlignment="Center"
+                               Visibility="{Binding HasSelection,
+                                   Converter={StaticResource BoolToVisibility},
+                                   ConverterParameter=Inverse}"/>
 
-    <!-- Single child: a Grid that stacks both panels -->
-    <Grid>
+                    <!-- Properties form -->
+                    <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                  Visibility="{Binding HasSelection,
+                                      Converter={StaticResource BoolToVisibility}}">
+                        <StackPanel Margin="14"
+                                    DataContext="{Binding SelectedPlaceholder}">
 
-        <!-- "No Selection" message — visible when nothing is selected -->
-        <TextBlock Text="Select a placeholder&#10;to edit its properties."
-                   Foreground="{StaticResource TextSecondary}"
-                   FontSize="13" FontStyle="Italic"
-                   TextAlignment="Center"
-                   HorizontalAlignment="Center"
-                   VerticalAlignment="Center"
-                   Visibility="{Binding HasSelection,
-                       Converter={StaticResource BoolToVisibility},
-                       ConverterParameter=Inverse}"/>
+                            <TextBlock Text="Placeholder Properties"
+                                       Style="{StaticResource SectionLabel}"
+                                       Margin="0,4,0,10"/>
 
-        <!-- Properties ScrollViewer — visible when a placeholder is selected -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto"
-                      Visibility="{Binding HasSelection,
-                          Converter={StaticResource BoolToVisibility}}">
-            <StackPanel Margin="14" DataContext="{Binding SelectedPlaceholder}">
+                            <!-- Variable Name -->
+                            <TextBlock Text="Variable Name"
+                                       Foreground="{StaticResource TextSecondary}"
+                                       FontSize="11" Margin="0,0,0,2"/>
+                            <TextBox Style="{StaticResource DarkTextBox}"
+                                     Text="{Binding VariableName,
+                                         UpdateSourceTrigger=PropertyChanged}"
+                                     Margin="0,0,0,10"/>
 
-                <TextBlock Text="PLACEHOLDER PROPERTIES"
-                           Style="{StaticResource SectionLabel}"
-                           Margin="0,4,0,8"/>
+                            <!-- Type -->
+                            <TextBlock Text="Type"
+                                       Foreground="{StaticResource TextSecondary}"
+                                       FontSize="11" Margin="0,0,0,2"/>
+                            <ComboBox Style="{StaticResource DarkComboBox}"
+                                      SelectedValue="{Binding Type}"
+                                      SelectedValuePath="Content"
+                                      Margin="0,0,0,12">
+                                <ComboBoxItem Content="text"/>
+                                <ComboBoxItem Content="image"/>
+                            </ComboBox>
 
-                <!-- Variable Name -->
-                <TextBlock Text="Variable Name (maps to Excel column)"
-                           Foreground="{StaticResource TextSecondary}" FontSize="11"
-                           Margin="0,0,0,2"/>
-                <TextBox Style="{StaticResource DarkTextBox}"
-                         Text="{Binding VariableName, UpdateSourceTrigger=PropertyChanged}"
-                         Margin="0,0,0,8"/>
+                            <!-- Position & Size -->
+                            <TextBlock Text="Position &amp; Size"
+                                       Style="{StaticResource SectionLabel}"/>
+                            <Grid Margin="0,4,0,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="8"/>
+                                    <ColumnDefinition/>
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="8"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
 
-                <!-- Type selector -->
-                <TextBlock Text="Type"
-                           Foreground="{StaticResource TextSecondary}" FontSize="11"
-                           Margin="0,0,0,2"/>
-                <ComboBox Style="{StaticResource DarkComboBox}"
-                          SelectedValue="{Binding Type}"
-                          SelectedValuePath="Content"
-                          Margin="0,0,0,12">
-                    <ComboBoxItem Content="text"/>
-                    <ComboBoxItem Content="image"/>
-                </ComboBox>
+                                <TextBlock Grid.Row="0" Grid.Column="0" Text="X"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <TextBox   Grid.Row="1" Grid.Column="0"
+                                           Style="{StaticResource DarkTextBox}"
+                                           Text="{Binding Left, UpdateSourceTrigger=PropertyChanged}"/>
 
-                <!-- Position & Size -->
-                <TextBlock Text="POSITION &amp; SIZE"
-                           Style="{StaticResource SectionLabel}"/>
-                <Grid Margin="0,0,0,4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition/><ColumnDefinition/>
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition/><RowDefinition/>
-                        <RowDefinition/><RowDefinition/>
-                    </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0" Grid.Column="2" Text="Y"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <TextBox   Grid.Row="1" Grid.Column="2"
+                                           Style="{StaticResource DarkTextBox}"
+                                           Text="{Binding Top, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <TextBlock Grid.Row="0" Grid.Column="0" Text="X"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,4,2"/>
-                    <TextBox Grid.Row="1" Grid.Column="0"
-                             Style="{StaticResource DarkTextBox}"
-                             Text="{Binding Left, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,4,6"/>
+                                <TextBlock Grid.Row="3" Grid.Column="0" Text="Width"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <TextBox   Grid.Row="4" Grid.Column="0"
+                                           Style="{StaticResource DarkTextBox}"
+                                           Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}"/>
 
-                    <TextBlock Grid.Row="0" Grid.Column="1" Text="Y"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2"/>
-                    <TextBox Grid.Row="1" Grid.Column="1"
-                             Style="{StaticResource DarkTextBox}"
-                             Text="{Binding Top, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,6"/>
+                                <TextBlock Grid.Row="3" Grid.Column="2" Text="Height"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <TextBox   Grid.Row="4" Grid.Column="2"
+                                           Style="{StaticResource DarkTextBox}"
+                                           Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}"/>
+                            </Grid>
 
-                    <TextBlock Grid.Row="2" Grid.Column="0" Text="Width"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,4,2"/>
-                    <TextBox Grid.Row="3" Grid.Column="0"
-                             Style="{StaticResource DarkTextBox}"
-                             Text="{Binding Width, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,4,0"/>
+                            <!-- TEXT STYLE (shown only when type = text) -->
+                            <StackPanel Visibility="{Binding IsTextType,
+                                            Converter={StaticResource BoolToVisibility}}">
 
-                    <TextBlock Grid.Row="2" Grid.Column="1" Text="Height"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2"/>
-                    <TextBox Grid.Row="3" Grid.Column="1"
-                             Style="{StaticResource DarkTextBox}"
-                             Text="{Binding Height, UpdateSourceTrigger=PropertyChanged}"/>
+                                <TextBlock Text="Text Style" Style="{StaticResource SectionLabel}"/>
+
+                                <TextBlock Text="Font Family"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <TextBox Style="{StaticResource DarkTextBox}"
+                                         Text="{Binding FontFamily, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,8"/>
+
+                                <TextBlock Text="Font Size (pt)"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <TextBox Style="{StaticResource DarkTextBox}"
+                                         Text="{Binding FontSize, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,8"/>
+
+                                <TextBlock Text="Color (#AARRGGBB)"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <TextBox Style="{StaticResource DarkTextBox}"
+                                         Text="{Binding TextColor, UpdateSourceTrigger=PropertyChanged}"
+                                         Margin="0,0,0,8"/>
+
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                    <CheckBox Content="Bold"
+                                              IsChecked="{Binding IsBold}"
+                                              Foreground="{StaticResource TextPrimary}"
+                                              Margin="0,0,16,0"/>
+                                    <CheckBox Content="Italic"
+                                              IsChecked="{Binding IsItalic}"
+                                              Foreground="{StaticResource TextPrimary}"/>
+                                </StackPanel>
+
+                                <TextBlock Text="Horizontal Alignment"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox Style="{StaticResource DarkComboBox}"
+                                          SelectedValue="{Binding Alignment}"
+                                          SelectedValuePath="Content"
+                                          Margin="0,0,0,8">
+                                    <ComboBoxItem Content="left"/>
+                                    <ComboBoxItem Content="center"/>
+                                    <ComboBoxItem Content="right"/>
+                                </ComboBox>
+
+                                <TextBlock Text="Vertical Alignment"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox Style="{StaticResource DarkComboBox}"
+                                          SelectedValue="{Binding VerticalAlignment}"
+                                          SelectedValuePath="Content"
+                                          Margin="0,0,0,8">
+                                    <ComboBoxItem Content="top"/>
+                                    <ComboBoxItem Content="middle"/>
+                                    <ComboBoxItem Content="bottom"/>
+                                </ComboBox>
+
+                                <CheckBox Content="Word Wrap"
+                                          IsChecked="{Binding WordWrap}"
+                                          Foreground="{StaticResource TextPrimary}"
+                                          Margin="0,0,0,8"/>
+                            </StackPanel>
+
+                            <!-- IMAGE STYLE (shown only when type = image) -->
+                            <StackPanel Visibility="{Binding IsImageType,
+                                            Converter={StaticResource BoolToVisibility}}">
+
+                                <TextBlock Text="Image Style" Style="{StaticResource SectionLabel}"/>
+
+                                <TextBlock Text="Fit Mode"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <ComboBox Style="{StaticResource DarkComboBox}"
+                                          SelectedValue="{Binding FitMode}"
+                                          SelectedValuePath="Content"
+                                          Margin="0,0,0,8">
+                                    <ComboBoxItem Content="cover"/>
+                                    <ComboBoxItem Content="contain"/>
+                                    <ComboBoxItem Content="stretch"/>
+                                </ComboBox>
+
+                                <TextBlock Text="Corner Radius (px)"
+                                           Foreground="{StaticResource TextSecondary}"
+                                           FontSize="11" Margin="0,0,0,2"/>
+                                <TextBox Style="{StaticResource DarkTextBox}"
+                                         Text="{Binding CornerRadius,
+                                             UpdateSourceTrigger=PropertyChanged}"
+                                         ToolTip="Set to half of Width/Height for a perfect circle"/>
+                            </StackPanel>
+
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
-
-                <!-- TEXT STYLE SECTION -->
-                <StackPanel Visibility="{Binding DataContext.IsTextSelected,
-                                RelativeSource={RelativeSource AncestorType=Window},
-                                Converter={StaticResource BoolToVisibility}}">
-
-                    <TextBlock Text="TEXT STYLE" Style="{StaticResource SectionLabel}"/>
-
-                    <TextBlock Text="Font Family"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2"/>
-                    <TextBox Style="{StaticResource DarkTextBox}"
-                             Text="{Binding FontFamily, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,6"/>
-
-                    <TextBlock Text="Font Size (pt)"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2"/>
-                    <TextBox Style="{StaticResource DarkTextBox}"
-                             Text="{Binding FontSize, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,6"/>
-
-                    <TextBlock Text="Color (#AARRGGBB)"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2"/>
-                    <TextBox Style="{StaticResource DarkTextBox}"
-                             Text="{Binding TextColor, UpdateSourceTrigger=PropertyChanged}"
-                             Margin="0,0,0,6"/>
-
-                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                        <CheckBox Content="Bold"
-                                  IsChecked="{Binding IsBold}"
-                                  Foreground="{StaticResource TextPrimary}"
-                                  Margin="0,0,16,0"/>
-                        <CheckBox Content="Italic"
-                                  IsChecked="{Binding IsItalic}"
-                                  Foreground="{StaticResource TextPrimary}"/>
-                    </StackPanel>
-
-                    <TextBlock Text="Horizontal Alignment"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2"/>
-                    <ComboBox Style="{StaticResource DarkComboBox}"
-                              SelectedValue="{Binding Alignment}"
-                              SelectedValuePath="Content"
-                              Margin="0,0,0,6">
-                        <ComboBoxItem Content="left"/>
-                        <ComboBoxItem Content="center"/>
-                        <ComboBoxItem Content="right"/>
-                    </ComboBox>
-
-                    <TextBlock Text="Vertical Alignment"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2"/>
-                    <ComboBox Style="{StaticResource DarkComboBox}"
-                              SelectedValue="{Binding VerticalAlignment}"
-                              SelectedValuePath="Content"
-                              Margin="0,0,0,6">
-                        <ComboBoxItem Content="top"/>
-                        <ComboBoxItem Content="middle"/>
-                        <ComboBoxItem Content="bottom"/>
-                    </ComboBox>
-
-                    <CheckBox Content="Word Wrap"
-                              IsChecked="{Binding WordWrap}"
-                              Foreground="{StaticResource TextPrimary}"
-                              Margin="0,0,0,8"/>
-                </StackPanel>
-
-                <!-- IMAGE STYLE SECTION -->
-                <StackPanel Visibility="{Binding DataContext.IsImageSelected,
-                                RelativeSource={RelativeSource AncestorType=Window},
-                                Converter={StaticResource BoolToVisibility}}">
-
-                    <TextBlock Text="IMAGE STYLE" Style="{StaticResource SectionLabel}"/>
-
-                    <TextBlock Text="Fit Mode"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2"/>
-                    <ComboBox Style="{StaticResource DarkComboBox}"
-                              SelectedValue="{Binding FitMode}"
-                              SelectedValuePath="Content"
-                              Margin="0,0,0,6">
-                        <ComboBoxItem Content="cover"/>
-                        <ComboBoxItem Content="contain"/>
-                        <ComboBoxItem Content="stretch"/>
-                    </ComboBox>
-
-                    <TextBlock Text="Corner Radius (px)"
-                               Foreground="{StaticResource TextSecondary}" FontSize="11" Margin="0,0,0,2"/>
-                    <TextBox Style="{StaticResource DarkTextBox}"
-                             Text="{Binding CornerRadius, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="0 = sharp corners. Use half of width/height for a circle."/>
-                </StackPanel>
-
-            </StackPanel>
-        </ScrollViewer>
-
-    </Grid>
-</Border>
+            </Border>
 
         </Grid>
 
-        <!-- ══ STATUS BAR ═══════════════════════════════════════════════════════ -->
+        <!-- ══════════════════════════════════════════════════════════════════
+             STATUS BAR
+             ══════════════════════════════════════════════════════════════ -->
         <Border Grid.Row="2"
                 Background="{StaticResource PanelBrush}"
                 BorderBrush="{StaticResource BorderBrush}"
@@ -693,17 +695,13 @@
                     <ColumnDefinition/>
                     <ColumnDefinition Width="Auto"/>
                 </Grid.ColumnDefinitions>
-
                 <TextBlock Grid.Column="0"
                            Text="{Binding StatusMessage}"
                            Foreground="{StaticResource TextSecondary}"
-                           FontSize="11"
-                           VerticalAlignment="Center"/>
-
+                           FontSize="11" VerticalAlignment="Center"/>
                 <TextBlock Grid.Column="1"
                            Foreground="{StaticResource TextSecondary}"
-                           FontSize="11"
-                           VerticalAlignment="Center">
+                           FontSize="11" VerticalAlignment="Center">
                     <Run Text="{Binding ProgressValue, Mode=OneWay}"/>
                     <Run Text=" / "/>
                     <Run Text="{Binding ProgressMax, Mode=OneWay}"/>

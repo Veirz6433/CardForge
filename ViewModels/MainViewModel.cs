@@ -15,61 +15,38 @@ using System.Windows;
 
 namespace BulkImageGenerator.ViewModels
 {
-    /// <summary>
-    /// Root ViewModel for the main window.
-    /// Orchestrates template editing, Excel import, and the bulk generation pipeline.
-    ///
-    /// MVVM PATTERN NOTES:
-    ///   - [ObservableProperty] generates the public property + INotifyPropertyChanged wiring.
-    ///   - [RelayCommand] generates an ICommand property from a private method.
-    ///   - [RelayCommand(IncludeCancelCommand = true)] auto-generates a paired CancelCommand.
-    ///   - No code-behind logic: the View is purely declarative XAML bindings.
-    /// </summary>
     public sealed partial class MainViewModel : ObservableObject
     {
         // ── Services ───────────────────────────────────────────────────────────
         private readonly ImageGeneratorService _generatorService = new();
-        private readonly ExcelService          _excelService     = new();
+        private readonly ExcelService _excelService = new();
 
-        // ── Template State ─────────────────────────────────────────────────────
-
-        /// <summary>The root template configuration (serialized to .bigt JSON).</summary>
+        // ── Template ───────────────────────────────────────────────────────────
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(CanvasWidth))]
         [NotifyPropertyChangedFor(nameof(CanvasHeight))]
         private Template _currentTemplate = new();
 
-        /// <summary>Path to the loaded background image, bound to the canvas Image element.</summary>
         [ObservableProperty]
         private string _backgroundImagePath = string.Empty;
 
-        /// <summary>Output pixel width of the template canvas (from CurrentTemplate).</summary>
         public double CanvasWidth  => CurrentTemplate.CanvasWidth;
-        /// <summary>Output pixel height of the template canvas.</summary>
         public double CanvasHeight => CurrentTemplate.CanvasHeight;
 
-        // ── Placeholder Collection ─────────────────────────────────────────────
-
-        /// <summary>
-        /// The live collection of placeholder ViewModels displayed on the canvas.
-        /// Bound to the ItemsControl on the editor canvas.
-        /// </summary>
+        // ── Placeholders ───────────────────────────────────────────────────────
         public ObservableCollection<PlaceholderViewModel> Placeholders { get; } = new();
 
-        /// <summary>The currently selected placeholder (drives Properties Panel visibility).</summary>
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(HasSelection))]
         [NotifyPropertyChangedFor(nameof(IsTextSelected))]
         [NotifyPropertyChangedFor(nameof(IsImageSelected))]
         private PlaceholderViewModel? _selectedPlaceholder;
 
-        public bool HasSelection  => SelectedPlaceholder is not null;
+        public bool HasSelection   => SelectedPlaceholder is not null;
         public bool IsTextSelected  => SelectedPlaceholder?.Type == "text";
         public bool IsImageSelected => SelectedPlaceholder?.Type == "image";
 
-        // ── Excel & Generation State ───────────────────────────────────────────
-
-        /// <summary>Path to the imported Excel file.</summary>
+        // ── Excel ──────────────────────────────────────────────────────────────
         [ObservableProperty]
         [NotifyPropertyChangedFor(nameof(ExcelFileName))]
         private string _excelFilePath = string.Empty;
@@ -78,48 +55,55 @@ namespace BulkImageGenerator.ViewModels
             ? "No file imported"
             : Path.GetFileName(ExcelFilePath);
 
-        /// <summary>Number of rows detected in the imported Excel file.</summary>
         [ObservableProperty]
         private int _excelRowCount;
 
-        /// <summary>Directory where generated images will be saved.</summary>
+        private List<Dictionary<string, string>> _parsedRows = new();
+
+        // ── Assets Folder ──────────────────────────────────────────────────────
+        [ObservableProperty]
+        [NotifyPropertyChangedFor(nameof(AssetsFolderName))]
+        private string _assetsFolder = string.Empty;
+
+        public string AssetsFolderName => string.IsNullOrEmpty(AssetsFolder)
+            ? "No folder selected"
+            : Path.GetFileName(AssetsFolder.TrimEnd('\\', '/'));
+
+        // ── Output ─────────────────────────────────────────────────────────────
         [ObservableProperty]
         private string _outputDirectory = string.Empty;
 
-        /// <summary>Which Excel column to use as the output filename (optional).</summary>
         [ObservableProperty]
         private string _fileNameColumn = string.Empty;
 
         // ── Progress & Status ──────────────────────────────────────────────────
-
         [ObservableProperty] private int    _progressValue;
         [ObservableProperty] private int    _progressMax = 1;
-        [ObservableProperty] private string _statusMessage = "Ready.";
+        [ObservableProperty] private string _statusMessage = "Ready. Load a background image to start.";
         [ObservableProperty] private bool   _isGenerating;
 
-        /// <summary>Parsed Excel rows, held in memory between import and generation.</summary>
-        private List<Dictionary<string, string>> _parsedRows = new();
+        // ══════════════════════════════════════════════════════════════════════
+        // COMMANDS
+        // ══════════════════════════════════════════════════════════════════════
 
-        // ── Template Commands ──────────────────────────────────────────────────
-
-        /// <summary>Opens a file dialog to load a background image onto the canvas.</summary>
+        // ── Background Image ───────────────────────────────────────────────────
         [RelayCommand]
         private void LoadBackgroundImage()
         {
             var dialog = new OpenFileDialog
             {
                 Title  = "Select Background Image",
-                Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp;*.tiff|All Files|*.*"
+                Filter = "Image Files|*.png;*.jpg;*.jpeg;*.bmp|All Files|*.*"
             };
 
             if (dialog.ShowDialog() != true) return;
 
-            BackgroundImagePath              = dialog.FileName;
+            BackgroundImagePath = dialog.FileName;
             CurrentTemplate.BackgroundImagePath = dialog.FileName;
             StatusMessage = $"Background loaded: {Path.GetFileName(dialog.FileName)}";
         }
 
-        /// <summary>Adds a new Text placeholder at a default position in the center of the canvas.</summary>
+        // ── Add Text Placeholder ───────────────────────────────────────────────
         [RelayCommand]
         private void AddTextPlaceholder()
         {
@@ -139,10 +123,10 @@ namespace BulkImageGenerator.ViewModels
             Placeholders.Add(vm);
             CurrentTemplate.Placeholders.Add(model);
             SelectPlaceholder(vm);
-            StatusMessage = $"Added text placeholder: {{{model.VariableName}}}";
+            StatusMessage = $"Added text placeholder '{{{model.VariableName}}}'.";
         }
 
-        /// <summary>Adds a new Image placeholder at a default position.</summary>
+        // ── Add Image Placeholder ──────────────────────────────────────────────
         [RelayCommand]
         private void AddImagePlaceholder()
         {
@@ -162,25 +146,21 @@ namespace BulkImageGenerator.ViewModels
             Placeholders.Add(vm);
             CurrentTemplate.Placeholders.Add(model);
             SelectPlaceholder(vm);
-            StatusMessage = $"Added image placeholder: {{{model.VariableName}}}";
+            StatusMessage = $"Added image placeholder '{{{model.VariableName}}}'.";
         }
 
-        /// <summary>Removes the currently selected placeholder from the canvas and template.</summary>
-        [RelayCommand(CanExecute = nameof(HasSelection))]
+        // ── Delete Selected Placeholder ────────────────────────────────────────
+        [RelayCommand]
         private void DeleteSelectedPlaceholder()
         {
             if (SelectedPlaceholder is null) return;
-
             CurrentTemplate.Placeholders.Remove(SelectedPlaceholder.Model);
             Placeholders.Remove(SelectedPlaceholder);
             SelectedPlaceholder = null;
             StatusMessage = "Placeholder deleted.";
         }
 
-        /// <summary>
-        /// Called from code-behind when the user clicks a placeholder on the canvas.
-        /// Deselects all others, selects the clicked one.
-        /// </summary>
+        // ── Selection Helpers (called from code-behind) ────────────────────────
         public void SelectPlaceholder(PlaceholderViewModel? vm)
         {
             foreach (var p in Placeholders)
@@ -190,79 +170,51 @@ namespace BulkImageGenerator.ViewModels
             if (vm is not null) vm.IsSelected = true;
         }
 
-        /// <summary>Deselects all placeholders (called when canvas background is clicked).</summary>
         [RelayCommand]
-        private void ClearSelection()
-        {
-            SelectPlaceholder(null);
-        }
+        private void ClearSelection() => SelectPlaceholder(null);
 
-        // ── Canvas Size Commands ───────────────────────────────────────────────
-
-        [RelayCommand]
-        private void SetCanvasSize()
-        {
-            // For a complete implementation, this would open a dialog.
-            // Here we demonstrate the pattern with a direct mutation.
-            // CurrentTemplate.CanvasWidth / CanvasHeight are set from the dialog result,
-            // then OnPropertyChanged() is raised for CanvasWidth/CanvasHeight.
-            OnPropertyChanged(nameof(CanvasWidth));
-            OnPropertyChanged(nameof(CanvasHeight));
-        }
-
-        // ── Template Save / Load ───────────────────────────────────────────────
-
-        /// <summary>
-        /// Serializes the current template (with all placeholder positions/styles) to a .bigt JSON file.
-        /// Calls SyncToModel() on all placeholder VMs first to flush UI state into the model.
-        /// </summary>
+        // ── Save Template ──────────────────────────────────────────────────────
         [RelayCommand]
         private void SaveTemplate()
         {
-            // Flush all VM state back into their backing models before serialization.
             foreach (var vm in Placeholders)
                 vm.SyncToModel();
 
             var dialog = new SaveFileDialog
             {
-                Title            = "Save Template",
-                Filter           = "BulkImageGenerator Template|*.bigt|JSON File|*.json",
-                DefaultExt       = ".bigt",
-                FileName         = CurrentTemplate.Name
+                Title      = "Save Template",
+                Filter     = "BulkImageGenerator Template|*.bigt|JSON|*.json",
+                DefaultExt = ".bigt",
+                FileName   = CurrentTemplate.Name
             };
 
             if (dialog.ShowDialog() != true) return;
 
             var options = new JsonSerializerOptions { WriteIndented = true };
-            string json = JsonSerializer.Serialize(CurrentTemplate, options);
-            File.WriteAllText(dialog.FileName, json);
+            File.WriteAllText(dialog.FileName, JsonSerializer.Serialize(CurrentTemplate, options));
             StatusMessage = $"Template saved: {Path.GetFileName(dialog.FileName)}";
         }
 
-        /// <summary>
-        /// Deserializes a .bigt JSON file and rebuilds the canvas PlaceholderViewModels.
-        /// </summary>
+        // ── Load Template ──────────────────────────────────────────────────────
         [RelayCommand]
         private void LoadTemplate()
         {
             var dialog = new OpenFileDialog
             {
                 Title  = "Open Template",
-                Filter = "BulkImageGenerator Template|*.bigt|JSON File|*.json|All Files|*.*"
+                Filter = "BulkImageGenerator Template|*.bigt|JSON|*.json|All Files|*.*"
             };
 
             if (dialog.ShowDialog() != true) return;
 
             try
             {
-                string json     = File.ReadAllText(dialog.FileName);
-                var template    = JsonSerializer.Deserialize<Template>(json);
+                var template = JsonSerializer.Deserialize<Template>(File.ReadAllText(dialog.FileName));
                 if (template is null) throw new InvalidDataException("Template file is empty or corrupt.");
 
                 CurrentTemplate     = template;
                 BackgroundImagePath = template.BackgroundImagePath;
 
-                // Rebuild observable collection from deserialized model.
                 Placeholders.Clear();
                 foreach (var model in template.Placeholders)
                     Placeholders.Add(new PlaceholderViewModel(model));
@@ -276,12 +228,26 @@ namespace BulkImageGenerator.ViewModels
             }
         }
 
-        // ── Excel Import ───────────────────────────────────────────────────────
+        // ── Browse Assets Folder ───────────────────────────────────────────────
+        [RelayCommand]
+        private void BrowseAssetsFolder()
+        {
+            var dialog = new OpenFileDialog
+            {
+                Title           = "Select Assets Folder — pick any file inside it",
+                CheckFileExists = false,
+                FileName        = "Select Folder",
+                Filter          = "Any File|*.*",
+                ValidateNames   = false
+            };
 
-        /// <summary>
-        /// Opens a file dialog for the user to select an Excel file,
-        /// parses it using ExcelService, and stores the rows for generation.
-        /// </summary>
+            if (dialog.ShowDialog() != true) return;
+
+            AssetsFolder  = Path.GetDirectoryName(dialog.FileName) ?? string.Empty;
+            StatusMessage = $"Assets folder set: {AssetsFolderName}";
+        }
+
+        // ── Import Excel ───────────────────────────────────────────────────────
         [RelayCommand]
         private void ImportExcel()
         {
@@ -298,10 +264,8 @@ namespace BulkImageGenerator.ViewModels
                 ExcelFilePath = dialog.FileName;
                 _parsedRows   = _excelService.ParseFile(dialog.FileName);
                 ExcelRowCount = _parsedRows.Count;
-                ProgressMax   = ExcelRowCount;
-                StatusMessage = $"Imported {ExcelRowCount} rows from {ExcelFileName}.";
-
-                // Warn the user if placeholder names are not found in the Excel columns.
+                ProgressMax   = Math.Max(1, ExcelRowCount);
+                StatusMessage = $"Imported {ExcelRowCount} rows from '{ExcelFileName}'.";
                 ValidatePlaceholderMapping();
             }
             catch (Exception ex)
@@ -311,10 +275,6 @@ namespace BulkImageGenerator.ViewModels
             }
         }
 
-        /// <summary>
-        /// Checks that every placeholder's variableName exists as a column in the Excel data.
-        /// Shows a warning (not an error) so the user can review before generating.
-        /// </summary>
         private void ValidatePlaceholderMapping()
         {
             if (_parsedRows.Count == 0) return;
@@ -326,52 +286,81 @@ namespace BulkImageGenerator.ViewModels
                 .ToList();
 
             if (unmapped.Count > 0)
-            {
-                string msg = "The following placeholders have no matching Excel column:\n"
-                           + string.Join("\n", unmapped)
-                           + "\n\nThey will be skipped during generation.";
-                MessageBox.Show(msg, "Mapping Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
-            }
+                MessageBox.Show(
+                    "These placeholders have no matching Excel column:\n"
+                    + string.Join("\n", unmapped)
+                    + "\n\nThey will be skipped during generation.",
+                    "Mapping Warning", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
-        // ── Output Directory ───────────────────────────────────────────────────
-
+        // ── Browse Output Directory ────────────────────────────────────────────
         [RelayCommand]
         private void BrowseOutputDirectory()
         {
-            // FolderBrowserDialog requires a reference to System.Windows.Forms,
-            // OR use the modern Windows.Storage.Pickers (WinRT).
-            // Here we use a workaround with OpenFileDialog to stay pure WPF.
             var dialog = new OpenFileDialog
             {
-                Title            = "Select Output Directory",
-                CheckFileExists  = false,
-                CheckPathExists  = true,
-                FileName         = "Select Folder",
-                Filter           = "Folder|*.none",
-                ValidateNames    = false
+                Title           = "Select Output Directory — pick any file inside it",
+                CheckFileExists = false,
+                FileName        = "Select Folder",
+                Filter          = "Any File|*.*",
+                ValidateNames   = false
             };
 
             if (dialog.ShowDialog() == true)
             {
-                OutputDirectory = Path.GetDirectoryName(dialog.FileName)
-                                  ?? dialog.FileName;
-                StatusMessage = $"Output directory: {OutputDirectory}";
+                OutputDirectory = Path.GetDirectoryName(dialog.FileName) ?? string.Empty;
+                StatusMessage   = $"Output directory: {OutputDirectory}";
             }
         }
 
-        // ── Bulk Generation Command ────────────────────────────────────────────
-
+        // ── Resolve Image Paths ────────────────────────────────────────────────
         /// <summary>
-        /// Main generation command. Runs async on the thread pool via Task.Run (inside the service).
-        /// [IncludeCancelCommand = true] auto-generates GenerateAllCancelCommand for the Cancel button.
-        /// Progress is reported via IProgress&lt;T&gt; which marshals to the UI SynchronizationContext
-        /// automatically — no Dispatcher.Invoke needed [web:22].
+        /// Converts bare filenames in image columns (e.g. "alice.jpg") into
+        /// full absolute paths by prepending the selected AssetsFolder.
+        /// Full paths are left unchanged. Skipped if AssetsFolder is empty.
+        /// </summary>
+        private List<Dictionary<string, string>> ResolveImagePaths(
+            List<Dictionary<string, string>> rows)
+        {
+            var imageKeys = Placeholders
+                .Where(p => p.Type.Equals("image", StringComparison.OrdinalIgnoreCase))
+                .Select(p => p.VariableName)
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+            if (imageKeys.Count == 0 || string.IsNullOrWhiteSpace(AssetsFolder))
+                return rows;
+
+            var resolved = new List<Dictionary<string, string>>(rows.Count);
+
+            foreach (var row in rows)
+            {
+                var newRow = new Dictionary<string, string>(row, StringComparer.OrdinalIgnoreCase);
+
+                foreach (var key in imageKeys)
+                {
+                    if (!newRow.TryGetValue(key, out string? val)
+                        || string.IsNullOrWhiteSpace(val)) continue;
+
+                    // Only prepend folder if the value has no directory component.
+                    if (string.IsNullOrEmpty(Path.GetDirectoryName(val)))
+                        newRow[key] = Path.Combine(AssetsFolder, val);
+                }
+
+                resolved.Add(newRow);
+            }
+
+            return resolved;
+        }
+
+        // ── Generate All (Main Command) ────────────────────────────────────────
+        /// <summary>
+        /// IncludeCancelCommand = true auto-generates GenerateAllCancelCommand
+        /// which is bound to the Cancel button — no manual CancellationTokenSource needed.
         /// </summary>
         [RelayCommand(IncludeCancelCommand = true)]
         private async Task GenerateAllAsync(CancellationToken cancellationToken)
         {
-            // ── Pre-flight validation ──────────────────────────────────────────
+            // ── Pre-flight checks ──────────────────────────────────────────────
             if (_parsedRows.Count == 0)
             {
                 MessageBox.Show("Please import an Excel file first.",
@@ -393,14 +382,13 @@ namespace BulkImageGenerator.ViewModels
                 return;
             }
 
-            // Flush all VM state to the backing models before generation.
+            // Flush all VM state to backing models before generation.
             foreach (var vm in Placeholders)
                 vm.SyncToModel();
 
-            // ── Setup progress reporting ───────────────────────────────────────
-            // IProgress<T> captures the current SynchronizationContext at construction time.
-            // When Report() is called from a thread-pool thread, it automatically posts
-            // the callback to the UI thread — no Dispatcher.Invoke required.
+            // ── Progress reporter ──────────────────────────────────────────────
+            // IProgress<T> captures the UI SynchronizationContext here,
+            // so Report() calls automatically marshal to the UI thread.
             var progress = new Progress<(int Completed, int Total)>(report =>
             {
                 ProgressValue = report.Completed;
@@ -414,24 +402,26 @@ namespace BulkImageGenerator.ViewModels
 
             try
             {
-                // Prepare the service (loads background image bytes into memory once).
+                // Resolve bare image filenames → full paths.
+                var resolvedRows = ResolveImagePaths(_parsedRows);
+
                 await _generatorService.PrepareAsync(CurrentTemplate);
 
-                // Run the parallel batch loop — does not block the UI thread.
                 await _generatorService.GenerateAllAsync(
-                    rows:              _parsedRows,
+                    rows:              resolvedRows,
                     outputDirectory:   OutputDirectory,
                     fileNameColumn:    string.IsNullOrWhiteSpace(FileNameColumn) ? null : FileNameColumn,
                     progress:          progress,
                     cancellationToken: cancellationToken);
 
                 StatusMessage = $"✅ Done! {_parsedRows.Count} images saved to: {OutputDirectory}";
-                MessageBox.Show($"{_parsedRows.Count} images generated successfully!\n\nSaved to:\n{OutputDirectory}",
-                    "Generation Complete", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show(
+                    $"{_parsedRows.Count} images generated successfully!\n\nSaved to:\n{OutputDirectory}",
+                    "Complete", MessageBoxButton.OK, MessageBoxImage.Information);
             }
             catch (OperationCanceledException)
             {
-                StatusMessage = "⚠️ Generation cancelled by user.";
+                StatusMessage = "⚠️ Generation cancelled.";
             }
             catch (Exception ex)
             {
