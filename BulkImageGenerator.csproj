@@ -1,0 +1,17 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm"       Version="8.4.0" />
+    <PackageReference Include="SkiaSharp"                   Version="2.88.8" />
+    <PackageReference Include="SkiaSharp.Views.WPF"         Version="2.88.8" />
+    <PackageReference Include="ExcelDataReader"             Version="3.7.0" />
+    <PackageReference Include="ExcelDataReader.DataSet"     Version="3.7.0" />
+  </ItemGroup>
+</Project>
